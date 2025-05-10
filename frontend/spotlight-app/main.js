@@ -11,8 +11,8 @@ function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   mainWindow = new BrowserWindow({
-    width: 600,
-    height: 400,
+    width: 1200,
+    height: 800,
     frame: false,  // Rimuove la barra del titolo
     transparent: true,  // Rende la finestra trasparente
     resizable: false,
@@ -62,47 +62,32 @@ app.whenReady().then(() => {
   });
 });
 
-// Funzione per mostrare/nascondere il spotlight
+// to show and hide the spotlight
 function toggleSpotlight() {
   if (isVisible) {
     mainWindow.hide();
     isVisible = false;
   } else {
-    // Mostra la finestra e la posiziona al centro
+    // it shows the window in the center
     mainWindow.center();
     mainWindow.show();
     isVisible = true;
-    // Invia un messaggio al renderer per mettere il focus sull'input
+    // sends a message to render to put focus on input
     mainWindow.webContents.send('focus-search');
   }
 }
 
-// Chiudi l'app su tutte le piattaforme tranne macOS
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+
+ipcMain.on('execute-search', (event, query) => {
+  //executing query in the backend ...
+  //....
+  //results from the backend
+  const results = ["/Users/Documents/projects/personal/TiW_perMe/codehal/style.css", "/Users/Downloads/06_dinamicaSistMecc.pdf"];
+  event.reply('search-results', results); //send results back to renderer
 });
 
-// Pulisci le scorciatoie globali quando l'app si chiude
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-});
-
-// Gestisci la richiesta di esecuzione di programmi o apertura di file
-ipcMain.on('execute-item', (event, item) => {
-  if (item.type === 'application') {
-    // Qui puoi implementare il codice per avviare applicazioni
-    // Esempio per macOS: exec(`open -a "${item.name}"`);
-    // Esempio per Windows: exec(`start ${item.name}`);
-    console.log(`Apertura applicazione: ${item.name}`);
-  } else if (item.type === 'file') {
-    // Apri il file
-    shell.openPath(item.name);
-  } else if (item.type === 'folder') {
-    // Apri la cartella
-    shell.openPath(item.name);
-  }
-
-  // Nascondi lo spotlight dopo aver selezionato un elemento
-  mainWindow.hide();
-  isVisible = false;
+//each results can be opened
+ipcMain.on('open-file', (event, filePath) => {
+  shell.openPath(filePath)
+      .catch(err => console.error('Failed to open file: ', err));
 });

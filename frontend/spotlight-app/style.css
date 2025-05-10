@@ -31,13 +31,14 @@ body {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-  color: white;
+  color: #f00;
 }
 
 .search-input {
   display: flex;
   align-items: center;
   padding: 15px;
+  color: #f00;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -45,14 +46,14 @@ body {
   flex: 1;
   background: transparent;
   border: none;
-  color: white;
+  color: #f00;
   font-size: 18px;
   outline: none;
   padding: 5px 0;
 }
 
 .search-input input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: #f00;
 }
 
 .clear-search {

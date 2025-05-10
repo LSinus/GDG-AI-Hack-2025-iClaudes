@@ -1,66 +1,87 @@
 // 4. renderer.js - Script del processo renderer
 // File: renderer.js
+/*+
+The ipcRenderer module is an EventEmitter. It provides a few methods so it can be sent
+synchronous and asynchronous messages from the render process (web page) to the main process.
+You can also receive replies from the main process.
+ */
 const { ipcRenderer } = require('electron');
 
-// Elementi DOM
+//DOM's elements
 const searchInput = document.getElementById('searchInput');
 const clearSearchBtn = document.getElementById('clearSearch');
 const resultsList = document.getElementById('resultsList');
 const initialMessage = document.getElementById('initialMessage');
 const noResults = document.getElementById('noResults');
 
-// Esempi di dati (in un'app reale potresti ottenerli dal file system)
-const sampleData = [
-  { id: 1, type: 'application', name: 'Browser', icon: '🌐' },
-  { id: 2, type: 'application', name: 'Calendario', icon: '📅' },
-  { id: 3, type: 'application', name: 'Calcolatrice', icon: '🧮' },
-  { id: 4, type: 'file', name: 'Report Progetto.pdf', icon: '📄' },
-  { id: 5, type: 'folder', name: 'Documenti', icon: '📁' },
-  { id: 6, type: 'application', name: 'Orologio', icon: '⏰' },
-  { id: 7, type: 'application', name: 'Musica', icon: '🎵' },
-  { id: 8, type: 'application', name: 'Posta', icon: '✉️' },
-];
+const extensionIcons = {
+  'pdf': '📄',
+  'doc': '📝',
+  'docx': '📝',
+  'xls': '📊',
+  'xlsx': '📊',
+  'jpg': '🖼️',
+  'jpeg': '🖼️',
+  'png': '🖼️',
+  'gif': '🖼️',
+  'txt': '📄',
+  'mp3': '🎵',
+  'mp4': '🎬',
+  'zip': '🗜️',
+  'js': '📜',
+  'html': '🌐',
+  'css': '🎨',
+  // fallback
+  'default': '📁'
+};
 
-// Ascolta il messaggio per mettere il focus sull'input quando la finestra viene mostrata
+//Show/hide clear button on search input
+searchInput.addEventListener('input', ()=>{
+  clearSearchBtn.style.display = searchInput.value ? 'block': 'none';
+})
+// listen the message to put the focus on the input when the window is shown
 ipcRenderer.on('focus-search', () => {
   searchInput.focus();
-  searchInput.select(); // Seleziona tutto il testo esistente
+  searchInput.select(); // selects all the text written in the input
 });
 
-// Evento input per la ricerca in tempo reale
-searchInput.addEventListener('input', () => {
-  const query = searchInput.value.trim();
+//That means the app watches for any input, when it sees one,
+// it runs the function specified
 
-  // Mostra/nascondi il pulsante di cancellazione
-  clearSearchBtn.style.display = query ? 'block' : 'none';
+searchInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') {
+    //user pressed enter
+    const query = searchInput.value.trim();
 
-  if (!query) {
-    // Pulisci i risultati se la query è vuota
-    resultsList.innerHTML = '';
-    initialMessage.style.display = 'block';
-    noResults.style.display = 'none';
-    return;
+    //it executes the query in the backend
+    if(query){
+      /*const resultsList = document.getElementById('results');
+      resultsList.innerHTML='<p>Searching for results..</p>';*/
+      resultsList.innerHTML = `
+      <li class="result-item">
+        <div class="item-icon">🔎</div>
+        <div class="item-details">
+          <p class="item-name">Ricerca in corso...</p>
+          <p class="item-type">Attendi i risultati</p>
+        </div>
+      </li>
+    `;
+      //sending the query to the backend
+      ipcRenderer.send('execute-search', query);
+    }
   }
+})
 
-  // Filtra i risultati
-  const results = sampleData.filter(item =>
-    item.name.toLowerCase().includes(query.toLowerCase())
-  );
+ ipcRenderer.on('search-results', (event, results) => {
+  //listens for results
+   displayResults(results);
+ })
 
-  // Aggiorna l'interfaccia in base ai risultati
+  // updates the UI
   initialMessage.style.display = 'none';
+  displayResults(results);
 
-  if (results.length === 0) {
-    resultsList.innerHTML = '';
-    noResults.style.display = 'block';
-    noResults.textContent = `Nessun risultato trovato per "${query}"`;
-  } else {
-    noResults.style.display = 'none';
-    displayResults(results);
-  }
-});
-
-// Pulsante per cancellare la ricerca
+//to clear the research
 clearSearchBtn.addEventListener('click', () => {
   searchInput.value = '';
   searchInput.focus();
@@ -70,34 +91,50 @@ clearSearchBtn.addEventListener('click', () => {
   noResults.style.display = 'none';
 });
 
-// Tasto Escape per chiudere
+//escape to close
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    window.close(); // Chiude la finestra
+    window.close(); // closes the window
   }
 });
+function getFileIcon(filename){
+  const ext = filename.split('.').pop().toLowerCase();
+  return extensionIcons[ext] || extensionIcons['default'];
+}
 
-// Mostra i risultati della ricerca
+function getFileExtension(filename) {
+  return filename.split('.').pop().toLowerCase();
+}
+
+//shows results of the research
 function displayResults(results) {
+   //reset
   resultsList.innerHTML = '';
+  initialMessage.style.display = 'none';
+  noResults.style.display = 'none';
 
-  results.forEach(item => {
+  if(results.length === 0) {
+    noResults.style.display = 'block';
+    return;
+  }
+  results.forEach(filePath => {
+    const filename = filePath.split(/[\\/]/).pop(); //extract filename
+    const icon = getFileIcon(filename);
+    const ext = getFileExtension(filename);
+
     const li = document.createElement('li');
     li.className = 'result-item';
-
     li.innerHTML = `
-      <div class="item-icon">${item.icon}</div>
+      <div class="item-icon">${icon}</div>
       <div class="item-details">
-        <p class="item-name">${item.name}</p>
-        <p class="item-type">${item.type}</p>
+        <p class="item-name">${filename}</p>
+        <p class="item-type">${getFileExtension(filename).toUpperCase()} file</p>
       </div>
     `;
 
-    // Aggiunge evento click per eseguire l'elemento
     li.addEventListener('click', () => {
-      ipcRenderer.send('execute-item', item);
+      ipcRenderer.send('open-file', filePath);
     });
-
     resultsList.appendChild(li);
   });
 }
