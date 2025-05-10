@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Spotlight</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="spotlight-container">
+    <div class="spotlight-modal">
+      <div class="spotlight-content">
+        <!-- Campo di ricerca -->
+        <div class="search-input">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Cerca..."
+            autofocus
+          />
+          <button id="clearSearch" class="clear-search" style="display: none;">×</button>
+        </div>
+
+        <!-- Area risultati -->
+        <div class="results-area">
+          <div id="initialMessage" class="initial-message">
+            Scrivi per cercare...
+          </div>
+          <div id="noResults" class="no-results" style="display: none;">
+            Nessun risultato trovato
+          </div>
+          <ul id="resultsList" class="result-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>`
