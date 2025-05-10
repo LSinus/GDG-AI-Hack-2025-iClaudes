@@ -91,117 +91,116 @@ async def summarize_text(text, file_type):
     try:
         # Prompt specifici per tipo di file
         prompts = {
-            '.docx': """PYou are an Expert Document Summarizer and Analyst. Your task is to create a comprehensive, detailed, and faithful summary of the following text, which has been extracted from a Word document (`.docx`).
+            '.docx': """You are an Expert Document Analyst. Your task is to create a **concise yet faithful textual re-elaboration** of the following text, which is an exact Python transcription from a Word document (`.docx`). Your primary goal is to significantly reduce the length of the input transcription by selectively omitting non-essential details, while meticulously preserving all core messages, key arguments, structural flow of main points, and critical information. The output must be a lean but accurate representation of the original.
 
-            The summary you generate is critically important: it will serve as the primary reference point (representing an older version of the document) for a subsequent AI-driven comparison against a newer version. The goal of that future comparison is to determine if significant content changes, thematic shifts, or semantic differences have occurred. Therefore, your summary must be rich in detail, accurately reflect the core content of the Word document, and meticulously identify key concepts.
+            This concise re-elaboration is critically important: it will serve as the primary reference point (representing an older version of the document) for a subsequent AI-driven comparison against a newer version to detect significant content changes.
 
-            Given that the text originates from a `.docx` file, expect content that may include structured narrative, reports, articles, or other textual forms. Pay attention to the document's inherent structure, such as sections, arguments, and findings.
+            Given that the text originates from a `.docx` file, the transcription likely represents narrative content, reports, or structured text. Your concise re-elaboration should reflect this inherent nature.
 
             Please structure your output as follows:
 
-            1.  **Main Summary (Continuous Text):**
-            * Begin with a concise overview that clearly states the Word document's main purpose, overall scope, and primary objectives as evident from the provided text.
-            * Thoroughly identify and elaborate on the key sections, principal themes, and core arguments presented in the text.
-            * Extract and integrate important specific details, data points, critical findings, illustrative examples, or key conclusions that substantiate the main themes. Your summary should be factual and well-supported by the source text.
-            * While maintaining a continuous, flowing narrative (without numbered lists or bullet points in this section), try to preserve the logical progression of ideas and the structural essence of the original document if it is discernible from the text.
+            1.  **Main Concise Re-elaboration (Flowing, Selective, True to Core Content):**
+                * Begin by identifying and briefly stating the document's primary purpose and main scope if clearly discernible from the transcription.
+                * Focus on extracting and presenting the **key sections, core arguments, principal findings, and essential conclusions** from the transcription.
+                * **To achieve conciseness, you must actively cut redundant phrases, verbose explanations, less critical examples, or overly detailed supporting information.** However, ensure that the remaining text accurately represents the original's main points.
+                * Where possible, use key phrasing from the original transcription for the essential elements to maintain faithfulness, but rephrase for brevity when necessary.
+                * Preserve the logical flow and apparent structure of the *key information* from the original document. The re-elaboration should still feel like the original document in its core structure, but significantly shorter.
+                * The final text should be a continuous, flowing narrative of the essential content, substantially reduced in overall length compared to the input transcription.
 
             2.  **Keywords (Formatted List - Crucial for Comparison):**
-            * The summary *must* conclude with a list of the most significant and representative keywords and key terms/phrases extracted from the document.
-            * This list is vital for the subsequent comparison process. Choose keywords that truly encapsulate the core topics, unique identifiers, and essential semantic anchors of the document's content.
-            * Format this list *exactly* as follows, on a new line after the main summary:
-                `KEYWORDS: keyword1, keyword2, keyword3, term phrase 4, ...`
+                * The re-elaboration *must* conclude with a list of the most significant and representative keywords and key terms/phrases directly identifiable from the **core content** of the transcribed document text.
+                * This list is vital for the subsequent comparison process. Choose keywords that truly encapsulate the essential topics and unique identifiers of the document's core message.
+                * Format this list *exactly* as follows, on a new line after the main re-elaboration:
+                    `KEYWORDS: keyword1, keyword2, keyword3, term phrase 4, ...`
 
-            ***IMPORTANT: DO NOT include this character in your response: ` ***
+            ***IMPORTANT: DO NOT include NEVER AND NEVER this character in your response: `, ", ' ***
 
-            DOCUMENT TEXT (from .docx):
+            DOCUMENT TRANSCRIPTION (from .docx):
             {text}
 
-            SUMMARY:""",
+            CONCISE RE-ELABORATION:""",
 
-            '.pdf': """You are an Expert Document Summarizer and Analyst. Your task is to create a comprehensive, detailed, and faithful summary of the following text, which has been extracted from a PDF document (`.pdf`).
+            '.pdf': """You are an Expert Document Analyst. Your task is to create a faithful and structured textual re-elaboration of the following text, which is an exact Python transcription from a PDF document (`.pdf`). The goal is to make this re-elaboration as similar as possible to the original transcribed content in terms of information, phrasing, and structure, while ensuring a slightly enhanced text flow and clarity for subsequent AI analysis. **Avoid significant summarization, content alteration, or reinterpretation.**
 
-            The summary you generate is critically important: it will serve as the primary reference point (representing an older version of the document) for a subsequent AI-driven comparison against a newer version. The goal of that future comparison is to determine if significant content changes, thematic shifts, or semantic differences have occurred. Therefore, your summary must be rich in detail, accurately reflect the core content of the PDF, and meticulously identify key concepts.
+            This re-elaboration is critically important: it will serve as the primary reference point (representing an older version of the document) for a subsequent AI-driven comparison against a newer version to detect significant content changes.
 
-            Given that the text originates from a `.pdf` file, be aware that the content could range from formal reports and articles to brochures or scanned documents. Focus on extracting the substantive textual information, identifying structural elements like chapters or sections if evident, and noting any textual descriptions of significant visual elements (e.g., charts, tables) if they are part of the extracted text.
+            Given that the text originates from a `.pdf` file, the transcription might represent a wide variety of content types (reports, articles, forms, etc.). Your re-elaboration should mirror the nature of the provided transcribed text.
 
             Please structure your output as follows:
 
-            1.  **Main Summary (Continuous Text):**
-                * Begin with a concise overview that clearly states the PDF document's main purpose, overall scope, and primary objectives as evident from the provided text.
-                * Thoroughly identify and elaborate on the key sections, principal themes, and core arguments presented in the text.
-                * Extract and integrate important specific details, data points, critical findings, illustrative examples, or key conclusions that substantiate the main themes. Your summary should be factual and well-supported by the source text.
-                * While maintaining a continuous, flowing narrative (without numbered lists or bullet points in this section), try to preserve the logical progression of ideas and the structural essence of the original document if it is discernible from the text.
+            1.  **Main Textual Re-elaboration (Flowing, but True to Original Transcription):**
+                * If a clear main purpose or scope is immediately evident from the very beginning of the transcription, you may briefly state it as an introduction. Otherwise, proceed directly to re-elaborating the transcribed content.
+                * Present the content, sections (like chapters or distinct textual blocks), and themes largely as they appear in the provided transcription. Focus on preserving the original information, specific phrasing, and apparent structure of the transcription to the maximum extent possible.
+                * Ensure that important arguments, findings, specific examples, data points, or any textual descriptions of visual elements (if present in the transcription) are clearly presented, maintaining their original context and detail as found in the input text.
+                * You may *lightly* improve readability and logical flow where the transcription might be disjointed or raw. However, **prioritize fidelity to the transcribed content, its order, and its level of detail over extensive rephrasing or narrative creation.** The output should feel very much like the original transcription, just slightly polished for coherence.
 
             2.  **Keywords (Formatted List - Crucial for Comparison):**
-                * The summary *must* conclude with a list of the most significant and representative keywords and key terms/phrases extracted from the document.
-                * This list is vital for the subsequent comparison process. Choose keywords that truly encapsulate the core topics, unique identifiers, and essential semantic anchors of the document's content.
-                * Format this list *exactly* as follows, on a new line after the main summary:
+                * The re-elaboration *must* conclude with a list of the most significant and representative keywords and key terms/phrases directly identifiable from the transcribed document text.
+                * This list is vital for the subsequent comparison process. Choose keywords that truly encapsulate the core topics and unique identifiers of the document's transcribed content.
+                * Format this list *exactly* as follows, on a new line after the main re-elaboration:
                     `KEYWORDS: keyword1, keyword2, keyword3, term phrase 4, ...`
 
             ***IMPORTANT: DO NOT include this character in your response: ` ***
 
-            PDF DOCUMENT TEXT (from .pdf):
+            PDF DOCUMENT TRANSCRIPTION (from .pdf):
             {text}
 
-            SUMMARY:""",
+            RE-ELABORATION:""",
 
-            '.xlsx': """You are an Expert Document Summarizer and Analyst. Your task is to create a comprehensive, detailed, and faithful summary of the following text, which represents content extracted from an Excel spreadsheet (`.xlsx`).
+            '.xlsx': """You are an Expert Data Analyst and Document Specialist. Your task is to create a faithful and structured textual re-elaboration of the following text, which is an exact Python transcription from an Excel spreadsheet (`.xlsx`). The goal is to make this re-elaboration as similar as possible to the original transcribed data and structure, while presenting it with slightly enhanced text flow and clarity for subsequent AI analysis. **Avoid significant summarization, data aggregation (unless explicitly stated in the transcription), or interpretation beyond what the transcribed text directly supports.**
 
-            The summary you generate is critically important: it will serve as the primary reference point (representing an older version of the spreadsheet) for a subsequent AI-driven comparison against a newer version. The goal of that future comparison is to determine if significant content changes, thematic shifts, or semantic differences have occurred in the data or its interpretation. Therefore, your summary must accurately capture the essence of the spreadsheet's data, structure, and any discernible insights.
+            This re-elaboration is critically important: it will serve as the primary reference point (representing an older version of the spreadsheet) for a subsequent AI-driven comparison against a newer version to detect significant changes in data or structure.
 
-            Given that the text originates from an `.xlsx` file, expect data that might be tabular, lists of values, or textual descriptions of cell contents and sheet structures. Your primary focus should be on interpreting this data textually.
+            Given that the text originates from an `.xlsx` file, the transcription likely represents tabular data, cell contents, sheet names, or textual descriptions of data structures. Your re-elaboration should textually represent this data structure and content faithfully.
 
             Please structure your output as follows:
 
-            1.  **Main Summary (Continuous Text):**
-                * Begin with an overview of the spreadsheet's apparent purpose and how the data is broadly structured, based on the provided text.
-                * Identify and explain major data categories, variables, and their relationships if discernible from the textual representation.
-                * Highlight key trends, significant patterns, notable totals, averages, or anomalies in the data that can be inferred from the text.
-                * Include specific numerical values, percentages, or key statistics if they are prominent and support the main findings.
-                * If the text implies formulas, calculations, or data dependencies, try to summarize their purpose or impact.
-                * Summarize the main insights or conclusions that the data seems to support.
+            1.  **Main Textual Re-elaboration (Structured, Flowing, but True to Original Transcription):**
+                * If the transcription provides an explicit overview or purpose of the spreadsheet, you may state it briefly. Otherwise, focus on re-elaborating the transcribed data.
+                * Present the data categories, variables, values, and their apparent relationships largely as they appear in the provided transcription. If the transcription implies a tabular structure (e.g., rows and columns of data), your textual re-elaboration should reflect this structure clearly, perhaps by describing sheets, columns, and then their corresponding data, or by using consistent formatting to delineate records or data points.
+                * Ensure that specific numerical values, text entries, headers, and any notes from the transcription are accurately represented, maintaining their original context and detail.
+                * You may *lightly* improve the flow of the textual representation of the data (e.g., by introducing phrases like "The column 'X' contains values such as Y, Z" or "For the record/item A, the details are B, C"). However, **prioritize fidelity to the transcribed data, its structure, and its values over narrative creation or data interpretation.** The output should be a clear textual mirror of the transcribed spreadsheet content.
 
             2.  **Keywords (Formatted List - Crucial for Comparison):**
-                * The summary *must* conclude with a list of the most significant and representative keywords, key terms, main data categories, and important column/row headers (if present and relevant) from the spreadsheet text.
-                * This list is vital for the subsequent comparison process. Choose terms that truly encapsulate the core topics and unique identifiers of the spreadsheet's content.
-                * Format this list *exactly* as follows, on a new line after the main summary:
+                * The re-elaboration *must* conclude with a list of the most significant and representative keywords, key terms, main data categories, and important column/row headers (if present and clearly identifiable as such in the transcription).
+                * This list is vital for the subsequent comparison process. Choose terms that truly encapsulate the core data elements and structural identifiers of the spreadsheet's transcribed content.
+                * Format this list *exactly* as follows, on a new line after the main re-elaboration:
                     `KEYWORDS: keyword1, data category A, header B, term phrase 4, ...`
 
             ***IMPORTANT: DO NOT include this character in your response: ` ***
 
-            SPREADSHEET CONTENT TEXT (from .xlsx):
+            SPREADSHEET CONTENT TRANSCRIPTION (from .xlsx):
             {text}
 
-            SUMMARY:""",
+            RE-ELABORATION:""",
 
-            '.pptx': """You are an Expert Document Summarizer and Analyst. Your task is to create a comprehensive, detailed, and faithful summary of the following text, which has been extracted from a PowerPoint presentation (`.pptx`).
+            '.pptx': """You are an Expert Presentation Analyst. Your task is to create a faithful and structured textual re-elaboration of the following text, which is an exact Python transcription from a PowerPoint presentation (`.pptx`). The goal is to make this re-elaboration as similar as possible to the original transcribed slide content in terms of information, phrasing, and structure, while ensuring a slightly enhanced text flow and clarity for subsequent AI analysis. **Avoid significant summarization, content alteration, or reinterpretation of the slide messages.**
 
-            The summary you generate is critically important: it will serve as the primary reference point (representing an older version of the presentation) for a subsequent AI-driven comparison against a newer version. The goal of that future comparison is to determine if significant content changes, thematic shifts, or semantic differences have occurred. Therefore, your summary must accurately capture the key messages, structure, and core content of the presentation.
+            This re-elaboration is critically important: it will serve as the primary reference point (representing an older version of the presentation) for a subsequent AI-driven comparison against a newer version to detect significant content changes.
 
-            Given that the text originates from a `.pptx` file, expect content that may represent slide titles, bullet points, main text blocks from slides, and possibly speaker notes. Focus on reconstructing the presentation's narrative and key takeaways.
+            Given that the text originates from a `.pptx` file, the transcription likely represents slide titles, bullet points, main text blocks, and possibly speaker notes. Your re-elaboration should reflect this slide-based structure and content.
 
             Please structure your output as follows:
 
-            1.  **Main Summary (Continuous Text):**
-                * Start with an overview of the presentation's main objective, intended key messages, and target audience if inferable from the text.
-                * Break down the content by attempting to identify distinct sections or "slides" if the text structure suggests this, highlighting the key message or purpose of each.
-                * Analyze the flow and progression of ideas and arguments throughout the presentation as represented in the text.
-                * Identify and explain any textual descriptions of important visual elements, charts, or design choices if they are mentioned and contribute to the message.
-                * Highlight important data points, statistics, or examples used to support arguments within the presentation.
-                * Note any clear transitions or connections made between different topics or sections.
+            1.  **Main Textual Re-elaboration (Flowing by Slide/Section, but True to Original Transcription):**
+                * If the transcription begins with an overall presentation objective, you may briefly state it. Otherwise, proceed to re-elaborate the slide-by-slide content.
+                * Present the content as a sequence of information blocks, likely corresponding to individual slides or logical sections of the presentation, as suggested by the transcription. Clearly delineate these blocks if possible (e.g., by stating "Slide Title: X" or "On the topic of Y:").
+                * For each block/slide, reproduce the key messages, bullet points, data points, and any textual descriptions of visuals (if present in the transcription) with high fidelity to the original phrasing and detail.
+                * You may *lightly* improve the flow between points within a perceived slide or between closely related "slides" if the transcription is very fragmented. For example, you can use simple connecting phrases. However, **prioritize fidelity to the transcribed content of each conceptual slide/section, its order, and its level of detail over extensive narrative creation or rephrasing.** The output should clearly reflect the information as it might have appeared on the slides.
 
             2.  **Keywords (Formatted List - Crucial for Comparison):**
-                * The summary *must* conclude with a list of the most significant and representative keywords, key terms, and main topics covered in the presentation.
-                * This list is vital for the subsequent comparison process. Choose keywords that truly encapsulate the core topics and unique identifiers of the presentation's content.
-                * Format this list *exactly* as follows, on a new line after the main summary:
+                * The re-elaboration *must* conclude with a list of the most significant and representative keywords, key terms, and main topics covered in the presentation, as directly identifiable from the transcription.
+                * This list is vital for the subsequent comparison process. Choose keywords that truly encapsulate the core topics and unique identifiers of the presentation's transcribed content.
+                * Format this list *exactly* as follows, on a new line after the main re-elaboration:
                     `KEYWORDS: keyword1, keyword2, main topic A, term phrase 4, ...`
+
 
             ***IMPORTANT: DO NOT include this character in your response: ` ***
 
-            PRESENTATION TEXT (from .pptx):
+            PRESENTATION TRANSCRIPTION (from .pptx):
             {text}
 
-            SUMMARY:"""
+            RE-ELABORATION:"""
         }
 
         # Seleziona il prompt appropriato o usa quello di default

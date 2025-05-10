@@ -1,3 +1,4 @@
+from agent import summarize_document
 import os
 import asyncio
 import google.generativeai as genai
@@ -149,14 +150,17 @@ async def compare_document_versions(file_path: str, previous_summary: str) -> in
         return None
 
     print(f"Loading current document: {file_path}...")
-    current_text = await get_document_text(file_path)
+    #current_text = await get_document_text(file_path)
     
-    if not current_text:
-        print("Unable to extract text from the current document.")
-        return None
+    #if not current_text:
+    #    print("Unable to extract text from the current document.")
+    #    return None
 
     print("Comparing versions...")
-    result = await compare_versions(current_text, previous_summary)
+
+    current_summary = await summarize_document(file_path)
+
+    result = await compare_versions(current_summary, previous_summary)
     
     if result is None:
         print("Error during comparison.")
