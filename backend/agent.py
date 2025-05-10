@@ -1,249 +1,226 @@
 # Prima di eseguire questo script, assicurati di installare le librerie necessarie:
-# pip install langchain langchain-community pypdf docx2txt openpyxl google-generativeai langchain-google-genai unstructured
+# pip install google-generativeai pypdf docx2txt openpyxl unstructured python-pptx
 
 import os
 import asyncio
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, UnstructuredExcelLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains.summarize import load_summarize_chain
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
+import google.generativeai as genai
+import PyPDF2
+import docx2txt
+from unstructured.partition.xlsx import partition_xlsx
+from pptx import Presentation
 
 # Configurazione Gemini
-# IMPORTANTE: Inserisci qui la tua API key di Google Gemini
-# Puoi anche impostarla come variabile d'ambiente: GOOGLE_API_KEY
-os.environ["GOOGLE_API_KEY"] = "AIzaSyASlsh1jRxd2iZnM3E3FM1TlDZ4yarUUMU"  # Sostituisci con la tua API key
+GOOGLE_API_KEY = "AIzaSyASlsh1jRxd2iZnM3E3FM1TlDZ4yarUUMU"
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # Configurazione del modello
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    temperature=0,
-    convert_system_message_to_human=True
-)
+model = genai.GenerativeModel('gemini-2.0-flash')
 
-# Prompt per la riassummarizzazione
-map_prompt = PromptTemplate(
-    template="""Analizza attentamente il seguente testo e crea un riassunto conciso che catturi i punti principali:
-    {text}
-    
-    RIASSUNTO:""",
-    input_variables=["text"]
-)
-
-combine_prompt = PromptTemplate(
-    template="""Sintetizza i seguenti riassunti in un unico riassunto coerente e completo. 
-    Assicurati di mantenere tutti i punti chiave e di creare un testo fluido:
-    
-    {text}
-    
-    RIASSUNTO FINALE:""",
-    input_variables=["text"]
-)
-
-# ---------------------------------------------------------------------------
-
-async def get_document_loader(file_path):
-    """Restituisce il loader appropriato in base all'estensione del file."""
-    _, file_extension = os.path.splitext(file_path)
-    if file_extension.lower() == '.pdf':
-        return PyPDFLoader(file_path)
-    elif file_extension.lower() == '.docx':
-        return Docx2txtLoader(file_path)
-    elif file_extension.lower() in ['.xlsx', '.xls']:
-        # UnstructuredExcelLoader può estrarre testo da diverse celle
-        return UnstructuredExcelLoader(file_path, mode="elements")
-    else:
-        print(f"Formato file non supportato: {file_extension}")
+async def extract_text_from_docx(file_path):
+    """Estrae il testo da un file DOCX."""
+    try:
+        text = docx2txt.process(file_path)
+        return text
+    except Exception as e:
+        print(f"Errore nell'estrazione del testo da DOCX: {e}")
         return None
 
-async def load_document(loader):
-    """Carica il documento in modo asincrono."""
+async def extract_text_from_pdf(file_path):
+    """Estrae il testo da un file PDF."""
     try:
-        # Eseguiamo il caricamento in un thread separato per non bloccare l'event loop
-        loop = asyncio.get_event_loop()
-        documents = await loop.run_in_executor(None, loader.load)
-        return documents
+        text = ""
+        with open(file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+        return text
     except Exception as e:
-        print(f"Errore durante il caricamento del documento: {e}")
+        print(f"Errore nell'estrazione del testo da PDF: {e}")
+        return None
+
+async def extract_text_from_xlsx(file_path):
+    """Estrae il testo da un file XLSX."""
+    try:
+        elements = partition_xlsx(file_path)
+        text = "\n".join([str(element) for element in elements])
+        return text
+    except Exception as e:
+        print(f"Errore nell'estrazione del testo da XLSX: {e}")
+        return None
+
+async def extract_text_from_pptx(file_path):
+    """Estrae il testo da un file PowerPoint."""
+    try:
+        prs = Presentation(file_path)
+        text = []
+        
+        # Estrai testo da ogni slide
+        for slide in prs.slides:
+            slide_text = []
+            # Estrai testo dai placeholder
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    slide_text.append(shape.text)
+            # Aggiungi il testo della slide alla lista
+            if slide_text:
+                text.append("\n".join(slide_text))
+        
+        return "\n\n".join(text)
+    except Exception as e:
+        print(f"Error extracting text from PPTX: {e}")
+        return None
+
+async def get_document_text(file_path):
+    """Estrae il testo dal documento in base al suo tipo."""
+    _, file_extension = os.path.splitext(file_path)
+    
+    if file_extension.lower() == '.docx':
+        return await extract_text_from_docx(file_path)
+    elif file_extension.lower() == '.pdf':
+        return await extract_text_from_pdf(file_path)
+    elif file_extension.lower() in ['.xlsx', '.xls']:
+        return await extract_text_from_xlsx(file_path)
+    elif file_extension.lower() == '.pptx':
+        return await extract_text_from_pptx(file_path)
+    else:
+        print(f"Unsupported file format: {file_extension}")
+        return None
+
+async def summarize_text(text, file_type):
+    """Genera un riassunto del testo usando Gemini con un prompt specifico per il tipo di file."""
+    try:
+        # Prompt specifici per tipo di file
+        prompts = {
+            '.docx': """Provide a comprehensive and detailed analysis of the following Word document. 
+            Your summary should be a continuous, flowing text that:
+            - Begins with a brief overview of the document's main purpose and scope
+            - Breaks down the content into key sections and themes
+            - Highlights important arguments, findings, or conclusions
+            - Includes specific examples or data points that support the main points
+            - Maintains the logical flow and structure of the original document
+            - Ends with a list of the most significant keywords and terms used in the document
+
+            Write the summary as a continuous text without any numbered sections or bullet points.
+
+            DOCUMENT TEXT:
+            {text}
+
+            SUMMARY:""",
+
+            '.pdf': """Provide a comprehensive and detailed analysis of the following PDF document. 
+            Your summary should be a continuous, flowing text that:
+            - Starts with a clear overview of the document's purpose and scope
+            - Analyzes both the content and structural elements
+            - Identifies and explains key sections, chapters, or topics
+            - Includes relevant data, statistics, or findings
+            - Highlights any visual elements or formatting that contribute to the content
+            - Ends with a list of the most significant keywords and terms used in the document
+
+            Write the summary as a continuous text without any numbered sections or bullet points.
+
+            PDF TEXT:
+            {text}
+
+            SUMMARY:""",
+
+            '.xlsx': """Provide a comprehensive and detailed analysis of the following Excel spreadsheet. 
+            Your summary should be a continuous, flowing text that:
+            - Begins with an overview of the spreadsheet's purpose and structure
+            - Identifies and explains all major data categories and their relationships
+            - Highlights key trends, patterns, or anomalies in the data
+            - Includes specific numerical values, percentages, or statistics that are significant
+            - Analyzes any formulas or calculations present in the data
+            - Identifies any correlations or dependencies between different data points
+            - Summarizes the main findings or insights from the data
+            - Ends with a list of the most significant keywords, terms, and data categories used in the spreadsheet
+
+            Write the summary as a continuous text without any numbered sections or bullet points.
+
+            SPREADSHEET CONTENT:
+            {text}
+
+            SUMMARY:""",
+
+            '.pptx': """Provide a comprehensive and detailed analysis of the following PowerPoint presentation. 
+            Your summary should be a continuous, flowing text that:
+            - Starts with an overview of the presentation's main objective and target audience
+            - Breaks down the content slide by slide, highlighting key messages
+            - Analyzes the flow and progression of ideas throughout the presentation
+            - Identifies and explains any visual elements or design choices mentioned in the text
+            - Highlights important data points, statistics, or examples used
+            - Notes any transitions or connections between different topics
+            - Ends with a list of the most significant keywords and terms used in the presentation
+
+            Write the summary as a continuous text without any numbered sections or bullet points.
+
+            PRESENTATION TEXT:
+            {text}
+
+            SUMMARY:"""
+        }
+
+        # Seleziona il prompt appropriato o usa quello di default
+        prompt_template = prompts.get(file_type.lower(), """Provide a comprehensive and detailed analysis of the following text. 
+            Your summary should be a continuous, flowing text that:
+            - Begins with a clear overview of the content's main purpose
+            - Breaks down the information into key sections and themes
+            - Includes specific details, examples, or data points
+            - Maintains the logical flow of the original text
+            - Ends with a list of the most significant keywords and terms used
+
+            Write the summary as a continuous text without any numbered sections or bullet points.
+
+            TEXT TO SUMMARIZE:
+            {text}
+
+            SUMMARY:""")
+
+        prompt = prompt_template.format(text=text)
+        
+        response = await asyncio.to_thread(
+            model.generate_content,
+            prompt
+        )
+        
+        return response.text
+    except Exception as e:
+        print(f"Error during summary generation: {e}")
         return None
 
 async def summarize_document(file_path: str) -> str:
-    """
-    Carica, splitta e riassume un documento in modo asincrono.
-    """
+    """Carica e riassume un documento."""
     if not os.path.exists(file_path):
-        return f"Errore: Il file {file_path} non esiste."
+        return f"Error: File {file_path} does not exist."
 
-    print(f"Caricamento del documento: {file_path}...")
-    loader = await get_document_loader(file_path)
-    if not loader:
-        return "Impossibile caricare il documento."
+    print(f"Loading document: {file_path}...")
+    text = await get_document_text(file_path)
+    
+    if not text:
+        return "Unable to extract text from the document."
 
-    documents = await load_document(loader)
-    if not documents:
-        return "Nessun contenuto estratto dal documento."
+    print("Generating summary...")
+    _, file_extension = os.path.splitext(file_path)
+    summary = await summarize_text(text, file_extension)
+    
+    if not summary:
+        return "Error during summary generation."
 
-    print(f"Documento caricato. Numero di pagine/sezioni estratte: {len(documents)}")
-    # print("Contenuto grezzo della prima pagina/sezione (primi 200 caratteri):")
-    # print(documents[0].page_content[:200])
-    # print("-" * 20)
-
-    print("Divisione del testo in chunks...")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
-    split_texts = text_splitter.split_documents(documents)
-    print(f"Numero di chunks creati: {len(split_texts)}")
-
-    if not split_texts:
-        return "Nessun testo da riassumere dopo la divisione."
-
-    chain_type_to_use = "map_reduce"
-    if len(split_texts) == 1:
-        chain_type_to_use = "stuff"
-
-    print(f"Avvio della riassummarizzazione con la chain di tipo '{chain_type_to_use}'...")
-    try:
-        # Configurazione della chain con prompt appropriati
-        if chain_type_to_use == "stuff":
-            summary_chain = load_summarize_chain(
-                llm,
-                chain_type="stuff",
-                verbose=True
-            )
-        else:
-            summary_chain = load_summarize_chain(
-                llm,
-                chain_type="map_reduce",
-                map_prompt=PromptTemplate(
-                    template="""Analizza attentamente il seguente testo e crea un riassunto conciso che catturi i punti principali:
-                    {text}
-                    
-                    RIASSUNTO:""",
-                    input_variables=["text"]
-                ),
-                combine_prompt=PromptTemplate(
-                    template="""Sintetizza i seguenti riassunti in un unico riassunto coerente e completo. 
-                    Assicurati di mantenere tutti i punti chiave e di creare un testo fluido:
-                    
-                    {text}
-                    
-                    RIASSUNTO FINALE:""",
-                    input_variables=["text"]
-                ),
-                verbose=True
-            )
-
-        # Eseguiamo la chain in modo asincrono
-        loop = asyncio.get_event_loop()
-        summary_output = await loop.run_in_executor(
-            None,
-            lambda: summary_chain.invoke({"input_documents": split_texts})
-        )
-        final_summary = summary_output.get("output_text", "Nessun riassunto generato.")
-
-    except Exception as e:
-        return f"Errore durante la riassummarizzazione: {e}"
-
-    return final_summary
+    return summary
 
 async def main():
-    # --- Crea file di esempio (opzionale, puoi usare i tuoi) ---
-    # File DOCX
-    try:
-        from docx import Document
+    import sys
+    
+    if len(sys.argv) != 2:
+        print("Usage: python agent.py <file_path>")
+        print("Supported formats: .docx, .pdf, .xlsx, .pptx")
+        return
 
-        doc = Document()
-        doc.add_paragraph("Questo è un documento di prova per il riassunto.")
-        doc.add_paragraph("LangChain è uno strumento potente per lavorare con LLM.")
-        doc.add_paragraph(
-            "Questo file .docx sarà processato per estrarre il suo contenuto testuale e generare un riassunto conciso. Speriamo che l'esempio funzioni correttamente e dimostri le capacità del sistema nel gestire diversi formati di file, inclusi i documenti Word.")
-        doc.save("esempio.docx")
-        print("File 'esempio.docx' creato.")
-    except ImportError:
-        print(
-            "Libreria 'python-docx' non trovata. Impossibile creare 'esempio.docx'. Scaricala con 'pip install python-docx'")
-    except Exception as e:
-        print(f"Errore nella creazione di esempio.docx: {e}")
-
-    # File PDF (Creazione più complessa, usa un PDF esistente o creane uno semplice)
-    # Per semplicità, questo script non crea un PDF. Assicurati di avere un 'esempio.pdf'.
-    # Puoi creare un PDF da esempio.docx usando Word o uno strumento online.
-    # Qui assumiamo che tu ne abbia uno chiamato 'esempio.pdf'
-    # Se non hai 'esempio.pdf', il test per PDF fallirà.
-    # Esempio di come potresti creare un PDF semplice (richiede reportlab)
-    try:
-        from reportlab.pdfgen import canvas
-
-        c = canvas.Canvas("esempio.pdf")
-        c.drawString(72, 800, "Questo è un file PDF di esempio per il test di riassummarizzazione.")
-        c.drawString(72, 780, "Contiene del testo che LangChain dovrebbe essere in grado di processare.")
-        c.drawString(72, 760, "L'obiettivo è ottenere un riassunto testuale di questo contenuto.")
-        c.save()
-        print("File 'esempio.pdf' creato.")
-    except ImportError:
-        print(
-            "Libreria 'reportlab' non trovata. Impossibile creare 'esempio.pdf'. Scaricala con 'pip install reportlab'")
-    except Exception as e:
-        print(f"Errore nella creazione di esempio.pdf: {e}")
-
-    # File XLSX
-    try:
-        import openpyxl
-
-        workbook = openpyxl.Workbook()
-        sheet = workbook.active
-        sheet["A1"] = "Dati di esempio per XLSX."
-        sheet["B2"] = "LangChain può leggere anche file Excel."
-        sheet[
-            "C3"] = "Questa è la cella C3 e contiene informazioni utili per il riassunto del foglio di calcolo. Lo scopo è testare l'estrazione da diverse celle."
-        workbook.save("esempio.xlsx")
-        print("File 'esempio.xlsx' creato.")
-    except ImportError:
-        print(
-            "Libreria 'openpyxl' non trovata. Impossibile creare 'esempio.xlsx'. Scaricala con 'pip install openpyxl'")
-    except Exception as e:
-        print(f"Errore nella creazione di esempio.xlsx: {e}")
-
+    file_path = sys.argv[1]
+    summary = await summarize_document(file_path)
+    
+    print("\nFINAL SUMMARY:")
+    print(summary)
     print("-" * 30)
-
-    # --- Esegui la riassummarizzazione sui file di esempio ---
-    files_to_summarize = []
-    if os.path.exists("esempio.docx"):
-        files_to_summarize.append("esempio.docx")
-    else:
-        print("Skipping esempio.docx: File non trovato.")
-
-    if os.path.exists("esempio.pdf"):
-        files_to_summarize.append("esempio.pdf")
-    else:
-        print("Skipping esempio.pdf: File non trovato.")
-
-    if os.path.exists("esempio.xlsx"):
-        files_to_summarize.append("esempio.xlsx")
-    else:
-        print("Skipping esempio.xlsx: File non trovato.")
-
-    if not files_to_summarize:
-        print(
-            "\nNessun file di esempio trovato o creato. Assicurati di avere i file .docx, .pdf, .xlsx nella stessa directory o crea i file di esempio.")
-    else:
-        # Esegui la riassummarizzazione in parallelo per tutti i file
-        tasks = [summarize_document(file) for file in files_to_summarize]
-        summaries = await asyncio.gather(*tasks)
-        
-        for file, summary in zip(files_to_summarize, summaries):
-            print(f"\n--- Riassunto per: {file} ---")
-            print("\nRIASSUNTO FINALE:")
-            print(summary)
-            print("-" * 30)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-    # Pulizia (opzionale)
-    # try:
-    #     if os.path.exists("esempio.docx"): os.remove("esempio.docx")
-    #     if os.path.exists("esempio.pdf"): os.remove("esempio.pdf")
-    #     if os.path.exists("esempio.xlsx"): os.remove("esempio.xlsx")
-    #     print("\nFile di esempio rimossi.")
-    # except Exception as e:
-    #     print(f"Errore durante la rimozione dei file di esempio: {e}")
