@@ -7,7 +7,7 @@
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background-color: transparent;
       overflow: hidden;
     }
@@ -31,34 +31,27 @@
     .spotlight-content {
       width: 600px;
       max-width: 90%;
-      background-color: rgba(242, 242, 247, 0.85); /* iOS light background with transparency */
+      background-color: rgba(28, 28, 30, 0.85); /* iOS dark background with transparency */
       backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border-radius: 16px; /* iOS uses more rounded corners */
       overflow: hidden;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-      color: #000; /* iOS uses black text on light background */
-    }
-
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-      .spotlight-content {
-        background-color: rgba(28, 28, 30, 0.85); /* iOS dark mode background */
-        color: #fff;
-      }
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+      color: #fff; /* White text on dark background */
     }
 
     .search-input {
       display: flex;
       align-items: center;
       padding: 12px 16px;
-      border-bottom: 1px solid rgba(60, 60, 67, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .search-input input {
       flex: 1;
       background: transparent;
       border: none;
-      color: inherit; /* Uses parent's text color */
+      color: #fff; /* White text */
       font-size: 17px; /* iOS standard text size */
       outline: none;
       padding: 8px 0;
@@ -66,13 +59,13 @@
     }
 
     .search-input input::placeholder {
-      color: rgba(60, 60, 67, 0.6); /* iOS placeholder color */
+      color: rgba(235, 235, 245, 0.6); /* iOS dark mode placeholder color */
     }
 
     .clear-search {
-      background: rgba(120, 120, 128, 0.2); /* iOS button background */
+      background: rgba(150, 150, 160, 0.3); /* iOS dark mode button background */
       border: none;
-      color: inherit;
+      color: #fff;
       cursor: pointer;
       font-size: 16px;
       height: 22px;
@@ -106,8 +99,9 @@
       transition: background-color 0.2s;
     }
 
-    .result-item:active {
-      background-color: rgba(0, 122, 255, 0.1); /* iOS tint color when pressed */
+    .result-item:active,
+    .result-item:hover {
+      background-color: rgba(255, 255, 255, 0.1); /* iOS dark mode hover state */
     }
 
     .item-icon {
@@ -123,7 +117,7 @@
 
     .item-details {
       flex: 1;
-      border-bottom: 1px solid rgba(60, 60, 67, 0.1); /* iOS separator */
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* iOS dark mode separator */
       padding-bottom: 8px;
     }
 
@@ -135,18 +129,19 @@
       margin: 0 0 4px;
       font-size: 17px;
       font-weight: 500;
+      color: #fff;
     }
 
     .item-type {
       margin: 0;
       font-size: 14px;
-      color: rgba(60, 60, 67, 0.6); /* iOS secondary text color */
+      color: rgba(235, 235, 245, 0.6); /* iOS dark mode secondary text color */
     }
 
     .no-results, .initial-message {
       padding: 20px;
       text-align: center;
-      color: rgba(60, 60, 67, 0.6);
+      color: rgba(235, 235, 245, 0.6);
       font-size: 15px;
     }
 
@@ -160,30 +155,12 @@
     }
 
     .results-area::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.2);
+      background-color: rgba(255, 255, 255, 0.2);
       border-radius: 5px;
     }
 
-    @media (prefers-color-scheme: dark) {
-      .search-input {
-        border-bottom-color: rgba(255, 255, 255, 0.1);
-      }
-
-      .search-input input::placeholder {
-        color: rgba(235, 235, 245, 0.6);
-      }
-
-      .item-details {
-        border-bottom-color: rgba(255, 255, 255, 0.1);
-      }
-
-      .item-type, .no-results, .initial-message {
-        color: rgba(235, 235, 245, 0.6);
-      }
-
-      .results-area::-webkit-scrollbar-thumb {
-        background-color: rgba(255, 255, 255, 0.2);
-      }
+    .results-area::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(255, 255, 255, 0.3);
     }
   </style>
 </head>
