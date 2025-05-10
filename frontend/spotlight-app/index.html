@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Spotlight</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background-color: transparent;
+      overflow: hidden;
+    }
+
+    .spotlight-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .spotlight-modal {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .spotlight-content {
+      width: 600px;
+      max-width: 90%;
+      background-color: rgba(242, 242, 247, 0.85); /* iOS light background with transparency */
+      backdrop-filter: blur(20px);
+      border-radius: 16px; /* iOS uses more rounded corners */
+      overflow: hidden;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      color: #000; /* iOS uses black text on light background */
+    }
+
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+      .spotlight-content {
+        background-color: rgba(28, 28, 30, 0.85); /* iOS dark mode background */
+        color: #fff;
+      }
+    }
+
+    .search-input {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(60, 60, 67, 0.1);
+    }
+
+    .search-input input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: inherit; /* Uses parent's text color */
+      font-size: 17px; /* iOS standard text size */
+      outline: none;
+      padding: 8px 0;
+      font-weight: 400;
+    }
+
+    .search-input input::placeholder {
+      color: rgba(60, 60, 67, 0.6); /* iOS placeholder color */
+    }
+
+    .clear-search {
+      background: rgba(120, 120, 128, 0.2); /* iOS button background */
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font-size: 16px;
+      height: 22px;
+      width: 22px;
+      border-radius: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      padding: 0;
+      margin-left: 8px;
+    }
+
+    .results-area {
+      max-height: 350px;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .result-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .result-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .result-item:active {
+      background-color: rgba(0, 122, 255, 0.1); /* iOS tint color when pressed */
+    }
+
+    .item-icon {
+      margin-right: 16px;
+      font-size: 26px;
+      border-radius: 8px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .item-details {
+      flex: 1;
+      border-bottom: 1px solid rgba(60, 60, 67, 0.1); /* iOS separator */
+      padding-bottom: 8px;
+    }
+
+    .result-item:last-child .item-details {
+      border-bottom: none;
+    }
+
+    .item-name {
+      margin: 0 0 4px;
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    .item-type {
+      margin: 0;
+      font-size: 14px;
+      color: rgba(60, 60, 67, 0.6); /* iOS secondary text color */
+    }
+
+    .no-results, .initial-message {
+      padding: 20px;
+      text-align: center;
+      color: rgba(60, 60, 67, 0.6);
+      font-size: 15px;
+    }
+
+    /* iOS style scrollbar (minimal) */
+    .results-area::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .results-area::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .results-area::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 5px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .search-input {
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .search-input input::placeholder {
+        color: rgba(235, 235, 245, 0.6);
+      }
+
+      .item-details {
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .item-type, .no-results, .initial-message {
+        color: rgba(235, 235, 245, 0.6);
+      }
+
+      .results-area::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="spotlight-container">
+    <div class="spotlight-modal">
+      <div class="spotlight-content">
+        <!-- Campo di ricerca -->
+        <div class="search-input">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Cerca..."
+            autofocus
+          />
+          <button id="clearSearch" class="clear-search" style="display: none;">×</button>
+        </div>
+
+        <!-- Area risultati -->
+        <div class="results-area">
+          <div id="initialMessage" class="initial-message">
+            Scrivi per cercare...
+          </div>
+          <div id="noResults" class="no-results" style="display: none;">
+            Nessun risultato trovato
+          </div>
+          <ul id="resultsList" class="result-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
