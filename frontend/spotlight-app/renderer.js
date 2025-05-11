@@ -192,7 +192,7 @@ function setSearchingState(isActive) {
   if (isActive) {
     initialMessage.style.display = 'none';
     noResults.style.display = 'none';
-    resultsList.innerHTML = '<div class="loading-spinner">Searching...</div>';
+    resultsList.innerHTML = '<div class="loading-spinner"></div>';
   }
 }
 
