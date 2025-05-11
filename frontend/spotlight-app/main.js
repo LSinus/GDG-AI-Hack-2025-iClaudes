@@ -1,6 +1,8 @@
 // 1. main.js - Processo principale di Electron
 const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 // Variabile per tenere traccia della finestra principale
 let mainWindow = null;
@@ -44,16 +46,25 @@ function createWindow() {
     return false;
   });
 
-  // Aggiunta debug (da rimuovere in produzione)
-  // mainWindow.webContents.openDevTools();
+  // Handle window blur - hide when clicking outside
+  mainWindow.on('blur', () => {
+    if (isVisible) {
+      mainWindow.hide();
+      isVisible = false;
+    }
+  });
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  mainWindow.setAlwaysOnTop(true, 'floating');
 }
+
+
 
 // Quando l'app è pronta
 app.whenReady().then(() => {
   createWindow();
 
   // Registra lo shortcut globale Cmd+Space o Ctrl+Space
-  globalShortcut.register('CommandOrControl+Space', toggleSpotlight);
+  globalShortcut.register('Option+Space', toggleSpotlight);
 
   app.on('activate', () => {
     // Su macOS è comune ricreare una finestra quando
@@ -77,17 +88,54 @@ function toggleSpotlight() {
   }
 }
 
+// Hide window handler
+ipcMain.on('hide-window', () => {
+  mainWindow.hide();
+  isVisible = false;
+});
 
 ipcMain.on('execute-search', (event, query) => {
   //executing query in the backend ...
   //....
   //results from the backend
-  const results = ["/Users/Documents/projects/personal/TiW_perMe/codehal/style.css", "/Users/Downloads/06_dinamicaSistMecc.pdf"];
+  const results = ["/Users/giorgiasavo/Documents/projects/personal/TiW_perMe/codehal/style.css", "/Users/giorgiasavo/Downloads/06_dinamicaSistMecc.pdf"];
   event.reply('search-results', results); //send results back to renderer
 });
 
+
+
 //each results can be opened
 ipcMain.on('open-file', (event, filePath) => {
-  shell.openPath(filePath)
-      .catch(err => console.error('Failed to open file: ', err));
+  console.log('Attempting to open file:', filePath);
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if(err){
+      console.error('File does not exist');
+      return;
+    }
+
+    shell.openPath(filePath)
+      .then(result =>{
+        if(result){
+          console.error('Error opening file:', result);
+        }else{
+          console.log('File opened succesfully!');
+          // Hide spotlight after opening a file
+          mainWindow.hide();
+          isVisible = false;
+        }
+      })
+      .catch(err => {
+        console.error('Failed to open file: ', err)
+      });
+
+  });
+
+});
+
+app.on('window-all-closed', () =>{
+  if(process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
 });
