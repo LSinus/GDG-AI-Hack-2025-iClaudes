@@ -20,8 +20,10 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 REDIS_HOST = "localhost"  # Or your Redis instance's hostname
 REDIS_PORT = 6379  # Default Redis port
 REDIS_PASSWORD = None  # Or your Redis password, if any
-VECTOR_SET_NAME = "file_embeddings_set"  # Name for your Redis Vector Set
+VECTOR_SET_NAME = "file_embedding_set_2"  # Name for your Redis Vector Set
 
+user_repo_path = "../../workdir"
+user_repo_path = os.path.abspath(user_repo_path)
 
 def get_redis_connection():
     """Establishes and returns a Redis connection."""
@@ -231,16 +233,19 @@ class ChangeHandler(FileSystemEventHandler):
             if result_from_analysis:
                 print("[NETWORK_THREAD][INFO] Performing Redis vector similarity search")
                 embedding = self.embedding_model.encode(result_from_analysis).tolist()
+                #embedding = self.embedding_model.encode(query_text).tolist() // TODO uncomment to use directly the query from the user
                 # Ensure redis_client is initialized with decode_responses=True for string keys
                 redis_search_res = self.redis_client.vset().vsim(VECTOR_SET_NAME, embedding, True, 3)
 
                 print("[NETWORK_THREAD] Sending results")
+                net_results = []
                 for key, value in redis_search_res.items():
-                    if value >= 0.75:
+                    if value >= 0.63:
                         commit_hash = key.split(':')[1]
                         file_path = key.split(':')[0]
                         self.repo.git.checkout(commit_hash, '--', file_path)
-                        conn.sendall(file_path.encode('utf-8'))
+                        net_results.append(os.path.join(user_repo_path, file_path))
+                conn.sendall(json.dumps(net_results).encode('utf-8'))
             else:
                 print("[NETWORK_THREAD][INFO] Search query analysis returned no actionable result.")
                 # Optionally send a message indicating no results from analysis
@@ -601,9 +606,6 @@ def main():
     if not app.redis_client or not app.embedding_model:
         print("[EXIT] Cannot run example due to missing Redis connection or embedding model.")
         return  # Changed from exit() to return for cleaner exit from main
-
-    user_repo_path = "../../workdir_monitor_test"
-    user_repo_path = os.path.abspath(user_repo_path)
 
     if not os.path.exists(user_repo_path):
         print(f"[SETUP] Test directory {user_repo_path} does not exist. Creating it now.")
