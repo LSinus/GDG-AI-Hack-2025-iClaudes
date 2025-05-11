@@ -70,10 +70,11 @@ function connectSocket() {
   socket.on('search-results', (results) => {
     // Ensure results is an array of file paths
     const fileResults = Array.isArray(results) ? results : [];
-
+    console.log("results received");
     // If the main window exists, forward the results to the renderer
     if (mainWindow) {
       mainWindow.webContents.send('search-results', fileResults);
+      
     }
   });
 
