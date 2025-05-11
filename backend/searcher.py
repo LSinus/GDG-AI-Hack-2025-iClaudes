@@ -73,7 +73,7 @@ async def main():
 
     embedding = embedding_model.encode(analysis).tolist()
 
-    res = redis_client.vset().vsim(VECTOR_SET_NAME, embedding, True, 3)
+    res = redis_client.vset().vsim(VECTOR_SET_NAME, embedding, True, 1)
 
     print(res)
 

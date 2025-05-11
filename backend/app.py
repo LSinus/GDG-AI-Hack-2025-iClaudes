@@ -20,7 +20,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 REDIS_HOST = "localhost"  # Or your Redis instance's hostname
 REDIS_PORT = 6379  # Default Redis port
 REDIS_PASSWORD = None  # Or your Redis password, if any
-VECTOR_SET_NAME = "file_embeddings"  # Name for your Redis Vector Set
+VECTOR_SET_NAME = "file_embeddings_set"  # Name for your Redis Vector Set
 
 
 def get_redis_connection():
@@ -161,7 +161,7 @@ def store_in_redis(redis_client: redis.Redis, data: Dict[str, Any], vector_set_n
 class ChangeHandler(FileSystemEventHandler):
     """Handles file system events and triggers App actions. Now includes threaded socket listener."""
 
-    def __init__(self, app_instance, watch_path, redis_client, embedding_model):
+    def __init__(self, app_instance, watch_path, redis_client, embedding_model, repo):
         super().__init__()
         self.app = app_instance  # app_instance is an instance of App class
         self.watch_path = os.path.abspath(watch_path)
@@ -172,6 +172,7 @@ class ChangeHandler(FileSystemEventHandler):
         # Start the socket listening in a separate thread
         self.socket_thread = threading.Thread(target=self.listen_socket, daemon=True)
         self.socket_thread.start()
+        self.repo = repo
 
     def listen_socket(self):
         """Listens for incoming socket connections in a dedicated thread."""
@@ -234,7 +235,12 @@ class ChangeHandler(FileSystemEventHandler):
                 redis_search_res = self.redis_client.vset().vsim(VECTOR_SET_NAME, embedding, True, 3)
 
                 print("[NETWORK_THREAD] Sending results")
-                conn.sendall(json.dumps(redis_search_res).encode('utf-8'))
+                for key, value in redis_search_res.items():
+                    if value >= 0.75:
+                        commit_hash = key.split(':')[1]
+                        file_path = key.split(':')[0]
+                        self.repo.git.checkout(commit_hash, '--', file_path)
+                        conn.sendall(file_path.encode('utf-8'))
             else:
                 print("[NETWORK_THREAD][INFO] Search query analysis returned no actionable result.")
                 # Optionally send a message indicating no results from analysis
@@ -566,7 +572,7 @@ class App():
             # Decide if to proceed or return
             # return
 
-        self.event_handler = ChangeHandler(self, directory_to_watch, self.redis_client, self.embedding_model)
+        self.event_handler = ChangeHandler(self, directory_to_watch, self.redis_client, self.embedding_model, self.repo)
         self.observer = Observer()
         self.observer.schedule(self.event_handler, directory_to_watch, recursive=True)
 
