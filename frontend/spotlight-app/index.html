@@ -86,6 +86,32 @@
       margin-left: 8px;
     }
 
+    .mic-button {
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      margin-right: 8px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      width: 24px;
+      height: 24px;
+    }
+
+    .mic-button.recording {
+      color: #FF3B30; /* iOS red color to indicate recording */
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
     .results-area {
       max-height: 350px;
       overflow-y: auto;
@@ -191,25 +217,20 @@
   <div class="spotlight-container">
     <div class="spotlight-modal">
       <div class="spotlight-content">
-        <!-- Campo di ricerca -->
+        <!-- Campo di ricerca con microfono -->
         <div class="search-input">
+          <button id="micButton" class="mic-button">🎤</button>
           <input
             id="searchInput"
             type="text"
-            placeholder="Cerca..."
+            placeholder="Cerca o parla..."
             autofocus
           />
-          <div class="search-icon magnifying-glass">
-            <i class="fas fa-search"></i>
-          </div>
-           <button id="clearSearch" class="clear-search" style="display: none;">×</button>
+          <button id="clearSearch" class="clear-search" style="display: none;">×</button>
         </div>
 
         <!-- Area risultati -->
         <div class="results-area">
-          <div id="initialMessage" class="initial-message">
-            Scrivi per cercare...
-          </div>
           <div id="noResults" class="no-results" style="display: none;">
             Nessun risultato trovato
           </div>

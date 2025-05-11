@@ -1,5 +1,5 @@
-// 1. main.js - Processo principale di Electron
-const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell } = require('electron');
+// File: main.js - Processo principale di Electron
+const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -7,6 +7,19 @@ const os = require('os');
 // Variabile per tenere traccia della finestra principale
 let mainWindow = null;
 let isVisible = false;
+
+// Handle mic permission requests
+function handlePermissionRequest() {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      // Always allow microphone access
+      return callback(true);
+    }
+
+    // Deny all other permission requests
+    return callback(false);
+  });
+}
 
 function createWindow() {
   // Crea una finestra nascosta all'avvio
@@ -21,8 +34,12 @@ function createWindow() {
     show: false,  // Parte nascosta
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,  // For security, disable node integration
+      contextIsolation: true,  // Enable context isolation for security
+      enableRemoteModule: false, // Disable remote module for security
+      webSecurity: true,
+      // Enable audio for the window
+      audioAutoplay: true
     }
   });
 
@@ -53,17 +70,25 @@ function createWindow() {
       isVisible = false;
     }
   });
+
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setAlwaysOnTop(true, 'floating');
+
+  // For debugging
+  mainWindow.webContents.on('did-finish-load', () => {
+    // Optional: Open DevTools for debugging
+    // mainWindow.webContents.openDevTools({ mode: 'detach' });
+
+    // Initialize permission handling
+    handlePermissionRequest();
+  });
 }
-
-
 
 // Quando l'app è pronta
 app.whenReady().then(() => {
   createWindow();
 
-  // Registra lo shortcut globale Cmd+Space o Ctrl+Space
+  // Registra lo shortcut globale Option+Space
   globalShortcut.register('Option+Space', toggleSpotlight);
 
   app.on('activate', () => {
@@ -88,23 +113,34 @@ function toggleSpotlight() {
   }
 }
 
+// Sample search function - you would replace this with your actual search logic
+function searchFiles(query) {
+  // Placeholder function - in a real app, you'd implement file system search here
+  return [
+    "/Users/giorgiasavo/Documents/projects/personal/TiW_perMe/codehal/style.css",
+    "/Users/giorgiasavo/Downloads/06_dinamicaSistMecc.pdf"
+  ];
+}
+
 // Hide window handler
 ipcMain.on('hide-window', () => {
   mainWindow.hide();
   isVisible = false;
 });
 
+// Execute search
 ipcMain.on('execute-search', (event, query) => {
-  //executing query in the backend ...
-  //....
-  //results from the backend
-  const results = ["/Users/giorgiasavo/Documents/projects/personal/TiW_perMe/codehal/style.css", "/Users/giorgiasavo/Downloads/06_dinamicaSistMecc.pdf"];
-  event.reply('search-results', results); //send results back to renderer
+  console.log('Executing search for:', query);
+
+  // Here you would implement your actual search logic
+  // For now, we'll use the example results
+  const results = searchFiles(query);
+
+  // Send results back to renderer
+  event.sender.send('search-results', results);
 });
 
-
-
-//each results can be opened
+// Open file handler
 ipcMain.on('open-file', (event, filePath) => {
   console.log('Attempting to open file:', filePath);
   fs.access(filePath, fs.constants.F_OK, (err) => {
@@ -114,11 +150,11 @@ ipcMain.on('open-file', (event, filePath) => {
     }
 
     shell.openPath(filePath)
-      .then(result =>{
+      .then(result => {
         if(result){
           console.error('Error opening file:', result);
-        }else{
-          console.log('File opened succesfully!');
+        } else {
+          console.log('File opened successfully!');
           // Hide spotlight after opening a file
           mainWindow.hide();
           isVisible = false;
@@ -127,12 +163,11 @@ ipcMain.on('open-file', (event, filePath) => {
       .catch(err => {
         console.error('Failed to open file: ', err)
       });
-
   });
-
 });
 
-app.on('window-all-closed', () =>{
+// Handle app quit
+app.on('window-all-closed', () => {
   if(process.platform !== 'darwin') app.quit();
 });
 
