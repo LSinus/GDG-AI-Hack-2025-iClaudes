@@ -13,6 +13,8 @@ const clearSearchBtn = document.getElementById('clearSearch');
 const resultsList = document.getElementById('resultsList');
 const initialMessage = document.getElementById('initialMessage');
 const noResults = document.getElementById('noResults');
+const spotlightContent = document.querySelector('.spotlight-content');
+const spotlightContainer = document.querySelector('.spotlight-container');
 
 const extensionIcons = {
   'pdf': '📄',
@@ -34,16 +36,17 @@ const extensionIcons = {
   // fallback
   'default': '📁'
 };
-
-//Show/hide clear button on search input
-searchInput.addEventListener('input', ()=>{
-  clearSearchBtn.style.display = searchInput.value ? 'block': 'none';
-})
 // listen the message to put the focus on the input when the window is shown
 ipcRenderer.on('focus-search', () => {
   searchInput.focus();
   searchInput.select(); // selects all the text written in the input
 });
+
+//Show/hide clear button on search input
+searchInput.addEventListener('input', ()=>{
+  clearSearchBtn.style.display = searchInput.value ? 'block': 'none';
+})
+
 
 //That means the app watches for any input, when it sees one,
 // it runs the function specified
@@ -59,10 +62,10 @@ searchInput.addEventListener('keydown', (e)=>{
       resultsList.innerHTML='<p>Searching for results..</p>';*/
       resultsList.innerHTML = `
       <li class="result-item">
-        <div class="item-icon">🔎</div>
+        <div class="item-icon"></div>
         <div class="item-details">
-          <p class="item-name">Ricerca in corso...</p>
-          <p class="item-type">Attendi i risultati</p>
+          <p class="item-name"></p>
+          <p class="item-type"></p>
         </div>
       </li>
     `;
@@ -74,15 +77,19 @@ searchInput.addEventListener('keydown', (e)=>{
 
  ipcRenderer.on('search-results', (event, results) => {
   //listens for results
-   displayResults(results);
+   console.log('Received results:', results);
+     // updates the UI
+    initialMessage.style.display = 'none';
+    displayResults(results);
  })
 
-  // updates the UI
-  initialMessage.style.display = 'none';
-  displayResults(results);
 
 //to clear the research
-clearSearchBtn.addEventListener('click', () => {
+clearSearchBtn.addEventListener('click', (e) => {
+
+  e.stopPropagation();
+
+  //clears search input and reset UI
   searchInput.value = '';
   searchInput.focus();
   clearSearchBtn.style.display = 'none';
@@ -94,9 +101,21 @@ clearSearchBtn.addEventListener('click', () => {
 //escape to close
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    window.close(); // closes the window
+    ipcRenderer.send('hide-window');
+    //window.close(); // closes the window
   }
 });
+
+// Click outside to close spotlight
+document.addEventListener('mousedown', (e) => {
+  // If the click is on the container but not on the content, close the spotlight
+  const wasClickInsideContent = spotlightContent.contains(e.target);
+  if (!wasClickInsideContent) {
+    console.log('Click outside detected, closing spotlight');
+    ipcRenderer.send('hide-window');
+  }
+});
+
 function getFileIcon(filename){
   const ext = filename.split('.').pop().toLowerCase();
   return extensionIcons[ext] || extensionIcons['default'];
@@ -113,7 +132,7 @@ function displayResults(results) {
   initialMessage.style.display = 'none';
   noResults.style.display = 'none';
 
-  if(results.length === 0) {
+  if(!results || results.length === 0) {
     noResults.style.display = 'block';
     return;
   }
@@ -133,6 +152,7 @@ function displayResults(results) {
     `;
 
     li.addEventListener('click', () => {
+      console.log('File clicked:', filePath);
       ipcRenderer.send('open-file', filePath);
     });
     resultsList.appendChild(li);
