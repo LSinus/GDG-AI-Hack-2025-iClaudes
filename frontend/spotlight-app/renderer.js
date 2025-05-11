@@ -52,10 +52,7 @@ function initSpeechRecognition() {
     recognition = new window.SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-
-    // Change to user's system language instead of forcing Italian
-    // You can customize this or make it configurable
-    recognition.lang = navigator.language || 'en-US'; // Use browser's language or default to English
+    recognition.lang = 'it-IT'; // Set to Italian - change as needed
 
     // Handle results
     recognition.onresult = (event) => {
@@ -75,9 +72,7 @@ function initSpeechRecognition() {
 
     // Handle end of speech recognition
     recognition.onend = () => {
-      isRecording = false;
-      micButton.classList.remove('recording');
-      searchInput.placeholder = 'Cerca o parla...';
+      stopRecording();
 
       // If there's text, automatically execute search
       if (searchInput.value.trim()) {
@@ -88,30 +83,23 @@ function initSpeechRecognition() {
     // Handle errors
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
-      isRecording = false;
-      micButton.classList.remove('recording');
+      stopRecording();
 
       //If no speech detected, provide feedback
       if (event.error === 'no-speech') {
-        searchInput.placeholder = 'No voice detected. Retry...';
+        searchInput.placeholder = 'No voice rilevated. Retry...';
         setTimeout(() => {
-          searchInput.placeholder = 'Cerca o parla...';
+          searchInput.placeholder = 'type or speak...';
         }, 2000);
-      } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-        searchInput.placeholder = 'Microphone access denied';
-        console.error('Microphone permission denied');
-        setTimeout(() => {
-          searchInput.placeholder = 'Cerca o parla...';
-        }, 2000);
-        micButton.disabled = true;
       }
     };
 
-    console.log('Speech recognition initialized successfully');
-  } catch(error) {
-    console.error('Error initializing speech recognition:', error);
+    console.log('Speech recognition initialized succesfully');
+}catch(error){
+  console.error('Error initializing speech recognition:', error);
     micButton.style.display = 'none';
   }
+
 }
 
 // Toggle speech recognition
@@ -125,39 +113,32 @@ function toggleSpeechRecognition() {
 
 // Start recording
 function startRecording() {
-  // Ensure we stop any existing recognition session
-  if (recognition && isRecording) {
-    try {
-      recognition.stop();
-    } catch (e) {
-      console.error('Error stopping existing recognition:', e);
-    }
-  }
-
   try {
-    // Make sure the recognition object exists
-    if (!recognition) {
+    if (recognition) {
+      // Recreate the recognition object each time to avoid issues
       initSpeechRecognition();
+
+      // Start recording with delay to ensure initialization
+      setTimeout(() => {
+        try {
+          recognition.start();
+          console.log('Started recording');
+          isRecording = true;
+          micButton.classList.add('recording');
+          searchInput.placeholder = 'Listening...';
+
+          // Set a timeout to stop recording after 10 seconds if no speech detected
+          recognitionTimeout = setTimeout(() => {
+            if (isRecording) {
+              console.log('Recognition timeout - stopping');
+              stopRecording();
+            }
+          }, 10000);
+        } catch (e) {
+          console.error('Error starting recognition after delay:', e);
+        }
+      }, 100);
     }
-
-    // Start the recording
-    recognition.start();
-    console.log('Started recording');
-    isRecording = true;
-    micButton.classList.add('recording');
-    searchInput.placeholder = 'Listening...';
-
-    // Set a timeout to stop recording after 10 seconds if no speech detected
-    if (recognitionTimeout) {
-      clearTimeout(recognitionTimeout);
-    }
-
-    recognitionTimeout = setTimeout(() => {
-      if (isRecording) {
-        console.log('Recognition timeout - stopping');
-        stopRecording();
-      }
-    }, 10000);
   } catch (error) {
     console.error('Error starting speech recognition:', error);
     stopRecording();
@@ -170,15 +151,13 @@ function stopRecording() {
     clearTimeout(recognitionTimeout);
     recognitionTimeout = null;
   }
-
-  if (recognition && isRecording) {
+  if(recognition && isRecording){
     try {
       recognition.stop();
     } catch (error) {
       console.error('Error stopping speech recognition:', error);
     }
   }
-
   isRecording = false;
   micButton.classList.remove('recording');
   searchInput.placeholder = 'Cerca o parla...';
