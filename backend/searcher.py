@@ -1,10 +1,10 @@
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
 import os
 import asyncio
 import google.generativeai as genai
-from app import load_embedding_model
-from app import get_redis_connection
-from app import VECTOR_SET_NAME
+#from app import load_embedding_model
+#from app import get_redis_connection
+#from app import VECTOR_SET_NAME
 
 # Configurazione Gemini
 GOOGLE_API_KEY = "AIzaSyASlsh1jRxd2iZnM3E3FM1TlDZ4yarUUMU"
@@ -62,18 +62,18 @@ async def main():
         print(analysis)
     print("-" * 30)
 
-    model = load_embedding_model()
-    redis_client = get_redis_connection()
+   # model = load_embedding_model()
+   # redis_client = get_redis_connection()
 
-    if not self.redis_client:
-            print("[CRITICAL] Failed to connect to Redis. Embedding storage will not work.")
-    if not self.embedding_model:
-        print("[CRITICAL] Failed to load embedding model. Embedding generation will not work.")
+    #if not self.redis_client:
+        #    print("[CRITICAL] Failed to connect to Redis. Embedding storage will not work.")
+   # if not self.embedding_model:
+       # print("[CRITICAL] Failed to load embedding model. Embedding generation will not work.")
     
 
-    embedding = model.encode(file_content).tolist()
+   # embedding = model.encode(file_content).tolist()
 
-    res = redis_client.vset().vsim(VECTOR_SET_NAME, embedding)
+   # res = redis_client.vset().vsim(VECTOR_SET_NAME, embedding)
 
     print(res)
 
