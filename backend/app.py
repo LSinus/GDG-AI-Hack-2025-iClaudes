@@ -3,8 +3,10 @@ from sentence_transformers import SentenceTransformer
 import os
 import time
 from typing import List, Dict, Any
+from agent import summarize_document
 import git
 import shutil
+import asyncio
 
 # Watchdog imports for file system monitoring
 from watchdog.observers import Observer
@@ -16,7 +18,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 REDIS_HOST = "localhost"  # Or your Redis instance's hostname
 REDIS_PORT = 6379  # Default Redis port
 REDIS_PASSWORD = None  # Or your Redis password, if any
-VECTOR_SET_NAME = "file_metadata_embeddings"  # Name for your Redis Vector Set
+VECTOR_SET_NAME = "file_embeddings"  # Name for your Redis Vector Set
 
 
 def get_redis_connection():
@@ -48,7 +50,7 @@ def load_embedding_model(model_name: str = 'sentence-transformers/all-MiniLM-L6-
 
 
 # 3.  Metadata Extraction and Embedding Generation
-def process_file_and_get_data(
+async def process_file_and_get_data(
         abs_file_path: str,
         relative_file_path: str,
         model: SentenceTransformer,
@@ -72,7 +74,7 @@ def process_file_and_get_data(
         content_read = False
         for _ in range(3):  # Try 3 times
             try:
-                with open(abs_file_path, 'r', encoding='utf-8') as f:
+                with open(abs_file_path, 'rb') as f:
                     file_content = f.read()
                 content_read = True
                 break
@@ -91,7 +93,9 @@ def process_file_and_get_data(
             print(f"[INFO] File {abs_file_path} is empty. Skipping embedding.")
             return {}
 
-        embedding = model.encode(file_content).tolist()
+        summary = await summarize_document(abs_file_path)
+        print(summary)
+        embedding = model.encode(summary).tolist()
 
         metadata = {
             "file_name": file_name,
@@ -99,7 +103,7 @@ def process_file_and_get_data(
             "relative_file_path": relative_file_path,
             "commit_hash": commit_hash,
             "embedding": embedding,
-            "content_summary": file_content[:200]
+            #"content_summary": file_content[:200]
         }
         return metadata
     except FileNotFoundError:  # Catch if file is deleted between listing and processing
@@ -180,8 +184,8 @@ class ChangeHandler(FileSystemEventHandler):
             # print(f"[DEBUG_WATCHDOG] Ignoring common/temp file: {filename}")
             return False
 
-        # Only process .txt files for this application's embedding logic.
-        if not filename.endswith(".txt"):
+        # Only process .docx files for this application's embedding logic.
+        if not filename.endswith(".docx"):
             # print(f"[DEBUG_WATCHDOG] Ignoring non-txt file: {filename} (event path: {event_path})")
             return False
 
@@ -212,7 +216,7 @@ class ChangeHandler(FileSystemEventHandler):
         self.app.git_add(filepaths=relative_path)
 
         commit_message = f"Auto-commit: {event_type} on {relative_path}"
-        self.app.git_commit(commit_message)  # This will trigger embedding processing
+        asyncio.run(self.app.git_commit(commit_message))  # This will trigger embedding processing
 
     def on_created(self, event):
         super().on_created(event)
@@ -247,7 +251,7 @@ class ChangeHandler(FileSystemEventHandler):
 
             # Commit both changes together
             commit_message = f"Auto-commit: moved {os.path.relpath(event.src_path, self.app.path)} to {os.path.relpath(event.dest_path, self.app.path)}"
-            self.app.git_commit(commit_message)
+            asyncio.run(self.app.git_commit(commit_message))
 
 
 class App():
@@ -328,7 +332,7 @@ class App():
         except Exception as e:
             print(f"[ERROR] An unexpected error occurred during git_add: {e}")
 
-    def git_commit(self, message: str):
+    async def git_commit(self, message: str):
         if not self.repo:
             print("[DEBUG_COMMIT] Repository not initialized. Cannot commit.")
             return None
@@ -365,24 +369,24 @@ class App():
             new_commit = self.repo.index.commit(message)
             print(f"[INFO] Commit successful. New commit SHA: {new_commit.hexsha}")
 
-            # === collect affected .txt files ===
+            # === collect affected .docx files ===
             affected = []
             if new_commit.parents:
                 parent = new_commit.parents[0]
                 for diff in parent.diff(new_commit):
-                    if diff.change_type in ('A', 'M', 'R') and diff.b_path.endswith('.txt'):
+                    if diff.change_type in ('A', 'M', 'R') and diff.b_path.endswith('.docx'):
                         affected.append(diff.b_path)
             else:
                 for item in new_commit.tree.traverse():
-                    if item.path.endswith('.txt'):
+                    if item.path.endswith('.docx'):
                         affected.append(item.path)
 
             affected = list(set(affected))
             if affected:
                 print(f"[INFO] Processing embeddings for: {affected}")
-                self.process_committed_files_embeddings(new_commit.hexsha, affected)
+                await self.process_committed_files_embeddings(new_commit.hexsha, affected)
             else:
-                print(f"[INFO] No .txt files added/modified in this commit.")
+                print(f"[INFO] No .docx files added/modified in this commit.")
 
             return new_commit.hexsha
 
@@ -395,11 +399,10 @@ class App():
             print(f"[ERROR] Unexpected error in git_commit: {e}")
             return None
 
-    def call_agent_for_summirazion(self, commit_hash: str, relative_file_paths: List[str]):
 
 
-    def process_committed_files_embeddings(self, commit_hash: str, relative_file_paths: List[str]):
-        """Processes embeddings only for specified .txt files from a commit."""
+    async def process_committed_files_embeddings(self, commit_hash: str, relative_file_paths: List[str]):
+        """Processes embeddings only for specified .docx files from a commit."""
         if not self.repo or not self.redis_client or not self.embedding_model:
             print("[ERROR] Cannot process embeddings: App components missing.")
             return
@@ -413,7 +416,7 @@ class App():
                 continue
 
             print(f"[INFO] Processing file for embedding: {rel_path}")
-            file_data = process_file_and_get_data(
+            file_data = await process_file_and_get_data(
                 abs_file_path,
                 rel_path,
                 self.embedding_model,
@@ -457,9 +460,7 @@ class App():
             self.observer.join()
             print("[INFO] File system monitor shut down by stop_monitoring call.")
 
-
-# Example Usage
-if __name__ == '__main__':
+async def main():
     app = App()
     if not app.redis_client or not app.embedding_model:
         print("[EXIT] Cannot run example due to missing Redis connection or embedding model.")
@@ -472,7 +473,7 @@ if __name__ == '__main__':
     if not os.path.exists(user_repo_path):
         print(f"[SETUP] Test directory {user_repo_path} does not exist. Creating it now.")
         os.makedirs(user_repo_path, exist_ok=True)
-        print(f"[SETUP] Created test directory {user_repo_path}. You can now add/modify .txt files in it.")
+        print(f"[SETUP] Created test directory {user_repo_path}. You can now add/modify .docx files in it.")
     else:
         print(f"[SETUP] Using existing test directory: {user_repo_path}")
 
@@ -482,7 +483,7 @@ if __name__ == '__main__':
         # Optional: Perform an initial commit of existing files if the repo is new/has uncommitted changes
         print("\n[INFO] Checking for initial uncommitted changes...")
         app.git_add('.')  # Stage everything initially
-        initial_commit_hash = app.git_commit("Initial commit of existing files upon startup")
+        initial_commit_hash = await app.git_commit("Initial commit of existing files upon startup")
         if initial_commit_hash:
             print(f"Initial commit successful: {initial_commit_hash}")
         else:
@@ -497,3 +498,7 @@ if __name__ == '__main__':
     if app.redis_client:
         app.redis_client.close()  # This might not be reached if monitoring runs indefinitely
         print("Redis connection closed.")
+# Example Usage
+
+if __name__ == '__main__':
+    asyncio.run(main())
