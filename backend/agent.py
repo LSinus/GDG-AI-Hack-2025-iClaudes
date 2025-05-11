@@ -252,6 +252,7 @@ async def main():
 
     file_path = sys.argv[1]
     summary = await summarize_document(file_path)
+    embedding = model.encode(file_content).tolist()
     
     print("\nFINAL SUMMARY:")
     print(summary)

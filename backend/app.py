@@ -105,7 +105,7 @@ async def process_file_and_get_data(
             "relative_file_path": relative_file_path,
             "commit_hash": commit_hash,
             "embedding": embedding,
-            #"content_summary": file_content[:200]
+            "content_summary": summary
         }
         return metadata
     except FileNotFoundError:  # Catch if file is deleted between listing and processing
@@ -331,7 +331,7 @@ class App():
             print(f"[ERROR] An unexpected error occurred during git_init: {e}")
             self.repo = None
 
-    def git_add(self, filepaths='.'):
+    async def git_add(self, filepaths='.'):
         if not self.repo:
             print("[ERROR] Repository not initialized. Cannot add files.")
             return
@@ -346,10 +346,43 @@ class App():
 
             print(f"[INFO] Staging changes for: {processed_filepaths} in {self.path}...")
 
+            # Get the status of files before adding
+            if processed_filepaths == '.':
+                status_before = self.repo.git.status('--porcelain').splitlines()
+            else:
+                status_before = []
+                for fp in processed_filepaths:
+                    try:
+                        status = self.repo.git.status('--porcelain', fp).splitlines()
+                        status_before.extend(status)
+                    except git.exc.GitCommandError:
+                        continue
+
+            # Add the files
             if processed_filepaths == '.':  # Add all changes if '.'
                 self.repo.git.add(A=True)
             else:  # Add specific file(s)
                 self.repo.git.add(processed_filepaths)
+
+            # Check which files were modified
+
+            for status_line in status_before:
+                if status_line.startswith(' M'):  # M means modified
+                    file_path = status_line[3:].strip()
+                    if file_path in processed_filepaths or processed_filepaths == '.':
+                        from diff import compare_document_versions
+
+                        # Get the HEAD commit hash
+                        head_commit = self.repo.head.commit
+                        previous_commit_hash = head_commit.hexsha
+
+                        previous_summary = self.redis_client.hget(f"{file_path}:{previous_commit_hash}", "content_summary")
+
+                        return await compare_document_versions(file_path, previous_summary)
+
+
+
+
             print("[INFO] Changes staged.")
 
         except git.exc.GitCommandError as e:
@@ -513,12 +546,12 @@ def main():
     if app.repo:
         # Optional: Perform an initial commit of existing files if the repo is new/has uncommitted changes
         print("\n[INFO] Checking for initial uncommitted changes...")
-        app.git_add('.')  # Stage everything initially
+        res = asyncio.run(app.git_add('.') )  # Stage everything initially
         initial_commit_hash = asyncio.run(app.git_commit("Initial commit of existing files upon startup"))
         if initial_commit_hash:
             print(f"Initial commit successful: {initial_commit_hash}")
         else:
-            print("No initial changes to commit, or commit failed.")
+            print("No initial changes to commit")
 
         # Start monitoring
         app.start_monitoring(user_repo_path)
