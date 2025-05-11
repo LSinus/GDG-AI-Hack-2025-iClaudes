@@ -62,18 +62,18 @@ async def main():
         print(analysis)
     print("-" * 30)
 
-    model = load_embedding_model()
+    embedding_model = load_embedding_model()
     redis_client = get_redis_connection()
 
-    if not self.redis_client:
+    if not redis_client:
             print("[CRITICAL] Failed to connect to Redis. Embedding storage will not work.")
-    if not self.embedding_model:
+    if not embedding_model:
         print("[CRITICAL] Failed to load embedding model. Embedding generation will not work.")
     
 
-    embedding = model.encode(file_content).tolist()
+    embedding = embedding_model.encode(analysis).tolist()
 
-    res = redis_client.vset().vsim(VECTOR_SET_NAME, embedding)
+    res = redis_client.vset().vsim(VECTOR_SET_NAME, embedding, True, 3)
 
     print(res)
 

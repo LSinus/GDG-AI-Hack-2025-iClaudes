@@ -7,6 +7,8 @@ from agent import summarize_document
 import git
 import shutil
 import asyncio
+import socket
+import json
 
 # Watchdog imports for file system monitoring
 from watchdog.observers import Observer
@@ -25,7 +27,7 @@ def get_redis_connection():
     """Establishes and returns a Redis connection."""
     try:
         r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD,
-                        decode_responses=False)  # Keep bytes for vectors
+                        decode_responses=True)  # Keep bytes for vectors
         r.ping()  # Check if the connection is successful
         print("Successfully connected to Redis!")
         return r
@@ -160,11 +162,40 @@ def store_in_redis(redis_client: redis.Redis, data: Dict[str, Any], vector_set_n
 class ChangeHandler(FileSystemEventHandler):
     """Handles file system events and triggers App actions."""
 
-    def __init__(self, app_instance, watch_path):
+    def __init__(self, app_instance, watch_path, redis_client, embedding_model):
         super().__init__()
         self.app = app_instance
         self.watch_path = os.path.abspath(watch_path)
         self.git_dir_to_ignore = os.path.join(self.watch_path, '.git')
+        self.redis_client = redis_client
+        self.embedding_model = embedding_model
+
+        asyncio.run(self.listen())
+
+    async def listen(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 30717))
+            s.listen()
+            conn, addr = s.accept()
+            with conn:
+                print(f"[NETWORK] Connected by {addr}")
+                while True:
+                    data = conn.recv(10000)
+                    if not data:
+                        break
+                    await self.handle_network_request(conn, data)
+
+    async def handle_network_request(self, conn, data):
+        from searcher import analyze_search_query
+        print("[INFO] analyzing search query")
+        result = await analyze_search_query(data)
+        if result:
+            print("[INFO] performing redis vector similarity search")
+            embedding = self.embedding_model.encode(result).tolist()
+            res = self.redis_client.vset().vsim(VECTOR_SET_NAME, embedding, True, 3)
+            print("[NETWORK] sending results")
+            conn.send(json.dumps(res).encode('utf-8'))
+
 
     def _should_process(self, event_path):
         """Helper to decide if an event should be processed."""
@@ -434,7 +465,7 @@ class App():
             # Optionally, you could allow monitoring without Git, but the current flow depends on it.
             return
 
-        event_handler = ChangeHandler(self, directory_to_watch)
+        event_handler = ChangeHandler(self, directory_to_watch, self.redis_client, self.embedding_model)
         # Optional: For more verbose watchdog logging, use LoggingEventHandler
         # logging_event_handler = LoggingEventHandler() # Logs all events to console
 
@@ -460,7 +491,7 @@ class App():
             self.observer.join()
             print("[INFO] File system monitor shut down by stop_monitoring call.")
 
-async def main():
+def main():
     app = App()
     if not app.redis_client or not app.embedding_model:
         print("[EXIT] Cannot run example due to missing Redis connection or embedding model.")
@@ -483,7 +514,7 @@ async def main():
         # Optional: Perform an initial commit of existing files if the repo is new/has uncommitted changes
         print("\n[INFO] Checking for initial uncommitted changes...")
         app.git_add('.')  # Stage everything initially
-        initial_commit_hash = await app.git_commit("Initial commit of existing files upon startup")
+        initial_commit_hash = asyncio.run(app.git_commit("Initial commit of existing files upon startup"))
         if initial_commit_hash:
             print(f"Initial commit successful: {initial_commit_hash}")
         else:
@@ -501,4 +532,4 @@ async def main():
 # Example Usage
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
