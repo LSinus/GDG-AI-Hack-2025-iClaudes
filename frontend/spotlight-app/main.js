@@ -56,15 +56,7 @@ function connectSocket() {
     setTimeout(connectSocket, 5000);
   });
 
-  socket.on('connect_error', (error) => {
-    // Notify the renderer about the error
-    if (mainWindow) {
-      mainWindow.webContents.send('socket-status', {
-        connected: false,
-        error: error.message
-      });
-    }
-  });
+
 
   // Listen for search results from the backend
   socket.on('search-results', (results) => {
@@ -181,7 +173,6 @@ ipcMain.on('execute-search', (event, query) => {
   // Check if socket is connected
   if (!socket || !socket.connected) {
     connectSocket();
-
     // Return a temporary "connecting" message
     event.sender.send('search-results', []);
     event.sender.send('socket-status', {
@@ -197,7 +188,7 @@ ipcMain.on('execute-search', (event, query) => {
 
 // Open file handler
 ipcMain.on('open-file', (event, filePath) => {
-  fs.access(filePath, fs.constants.F_OK, (err) => {
+  fs.access("../../workdir_monitor_test/"+filePath, fs.constants.F_OK, (err) => {
     if(err){
       return;
     }
