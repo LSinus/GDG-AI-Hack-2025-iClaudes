@@ -7,9 +7,12 @@ contextBridge.exposeInMainWorld(
   'electronAPI', {
     focusSearch: (callback) => ipcRenderer.on('focus-search', callback),
     searchResults: (callback) => ipcRenderer.on('search-results', callback),
+    socketStatus: (callback) => ipcRenderer.on('socket-status', callback),
+    searchStatus: (callback) => ipcRenderer.on('search-status', callback),
     hideWindow: () => ipcRenderer.send('hide-window'),
     executeSearch: (query) => ipcRenderer.send('execute-search', query),
-    openFile: (path) => ipcRenderer.send('open-file', path)
+    openFile: (path) => ipcRenderer.send('open-file', path),
+    cancelSearch: () => ipcRenderer.send('cancel-search')
   }
 );
 

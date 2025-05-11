@@ -2,11 +2,13 @@
 const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
+const io = require('socket.io-client')
 
 // Variabile per tenere traccia della finestra principale
 let mainWindow = null;
 let isVisible = false;
+
+let socket = null;
 
 // Handle mic permission requests
 function handlePermissionRequest() {
@@ -19,6 +21,63 @@ function handlePermissionRequest() {
     // Deny all other permission requests
     return callback(false);
   });
+}
+
+// Connect to your backend socket server
+function connectSocket() {
+  // Replace with your actual backend socket URL
+  const SOCKET_URL = 'http://localhost:30717';
+
+  // Close any existing connection
+  if (socket) {
+    socket.close();
+  }
+
+  socket = io(SOCKET_URL, {
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    timeout: 10000
+  });
+
+  socket.on('connect', () => {
+    // Notify the renderer process that the connection is successful
+    if (mainWindow) {
+      mainWindow.webContents.send('socket-status', { connected: true });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    // Notify the renderer about disconnection
+    if (mainWindow) {
+      mainWindow.webContents.send('socket-status', { connected: false });
+    }
+    // Attempt to reconnect after a delay
+    setTimeout(connectSocket, 5000);
+  });
+
+  socket.on('connect_error', (error) => {
+    // Notify the renderer about the error
+    if (mainWindow) {
+      mainWindow.webContents.send('socket-status', {
+        connected: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Listen for search results from the backend
+  socket.on('search-results', (results) => {
+    // Ensure results is an array of file paths
+    const fileResults = Array.isArray(results) ? results : [];
+
+    // If the main window exists, forward the results to the renderer
+    if (mainWindow) {
+      mainWindow.webContents.send('search-results', fileResults);
+    }
+  });
+
+  return socket;
 }
 
 function createWindow() {
@@ -76,9 +135,6 @@ function createWindow() {
 
   // For debugging
   mainWindow.webContents.on('did-finish-load', () => {
-    // Optional: Open DevTools for debugging
-    // mainWindow.webContents.openDevTools({ mode: 'detach' });
-
     // Initialize permission handling
     handlePermissionRequest();
   });
@@ -86,6 +142,7 @@ function createWindow() {
 
 // Quando l'app è pronta
 app.whenReady().then(() => {
+  connectSocket();
   createWindow();
 
   // Registra lo shortcut globale Option+Space
@@ -113,55 +170,48 @@ function toggleSpotlight() {
   }
 }
 
-// Sample search function - you would replace this with your actual search logic
-function searchFiles(query) {
-  // Placeholder function - in a real app, you'd implement file system search here
-  return [
-    "/Users/giorgiasavo/Documents/projects/personal/TiW_perMe/codehal/style.css",
-    "/Users/giorgiasavo/Downloads/06_dinamicaSistMecc.pdf"
-  ];
-}
-
 // Hide window handler
 ipcMain.on('hide-window', () => {
   mainWindow.hide();
   isVisible = false;
 });
 
-// Execute search
+// Update the execute search IPC handler
 ipcMain.on('execute-search', (event, query) => {
-  console.log('Executing search for:', query);
+  // Check if socket is connected
+  if (!socket || !socket.connected) {
+    connectSocket();
 
-  // Here you would implement your actual search logic
-  // For now, we'll use the example results
-  const results = searchFiles(query);
+    // Return a temporary "connecting" message
+    event.sender.send('search-results', []);
+    event.sender.send('socket-status', {
+      connected: false,
+      connecting: true
+    });
+    return;
+  }
 
-  // Send results back to renderer
-  event.sender.send('search-results', results);
+  //Emit the search query to the backend via socket
+  socket.emit('perform-search', { query });
 });
 
 // Open file handler
 ipcMain.on('open-file', (event, filePath) => {
-  console.log('Attempting to open file:', filePath);
   fs.access(filePath, fs.constants.F_OK, (err) => {
     if(err){
-      console.error('File does not exist');
       return;
     }
 
     shell.openPath(filePath)
       .then(result => {
-        if(result){
-          console.error('Error opening file:', result);
-        } else {
-          console.log('File opened successfully!');
+        if(!result) {
           // Hide spotlight after opening a file
           mainWindow.hide();
           isVisible = false;
         }
       })
       .catch(err => {
-        console.error('Failed to open file: ', err)
+        // Silent error handling
       });
   });
 });
@@ -173,4 +223,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+});
+
+ipcMain.on('cancel-search', (event) => {
+  if (socket && socket.connected) {
+    socket.emit('cancel-search');
+  }
 });

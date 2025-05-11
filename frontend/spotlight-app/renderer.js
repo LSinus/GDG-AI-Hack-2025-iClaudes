@@ -9,6 +9,10 @@ const spotlightContent = document.querySelector('.spotlight-content');
 const spotlightContainer = document.querySelector('.spotlight-container');
 const micButton = document.getElementById('micButton');
 
+// Status tracking
+let isSearching = false;
+let socketConnected = false;
+
 // Voice recognition variables
 let recognition = null;
 let isRecording = false;
@@ -95,11 +99,10 @@ function initSpeechRecognition() {
     };
 
     console.log('Speech recognition initialized succesfully');
-}catch(error){
-  console.error('Error initializing speech recognition:', error);
+  } catch(error) {
+    console.error('Error initializing speech recognition:', error);
     micButton.style.display = 'none';
   }
-
 }
 
 // Toggle speech recognition
@@ -166,18 +169,36 @@ function stopRecording() {
 // Execute search
 function executeSearch(query) {
   if (query) {
-    resultsList.innerHTML = `
-      <li class="result-item">
-        <div class="item-icon"></div>
-        <div class="item-details">
-          <p class="item-name"></p>
-          <p class="item-type"></p>
-        </div>
-      </li>
-    `;
+    // Show loading indicator
+    setSearchingState(true);
+
+    // Check if socket is connected
+    if (!socketConnected) {
+      updateStatusMessage('Connecting to search server...');
+      // The main process will try to reconnect
+    }
+
     // Send the query to the backend
     window.electronAPI.executeSearch(query);
   }
+}
+
+// Set searching state
+function setSearchingState(isActive) {
+  isSearching = isActive;
+
+  if (isActive) {
+    initialMessage.style.display = 'none';
+    noResults.style.display = 'none';
+    resultsList.innerHTML = '<div class="loading-spinner">Searching...</div>';
+  }
+}
+
+// Update status message
+function updateStatusMessage(message) {
+  initialMessage.style.display = 'none';
+  noResults.style.display = 'block';
+  noResults.textContent = message;
 }
 
 // Initialize voice recognition on startup - Wait for DOM to be fully loaded
@@ -216,8 +237,33 @@ searchInput.addEventListener('keydown', (e) => {
 // Handle search results from main process
 window.electronAPI.searchResults((event, results) => {
   console.log('Received results:', results);
+  setSearchingState(false);
   initialMessage.style.display = 'none';
   displayResults(results);
+});
+
+// Handle socket status updates
+window.electronAPI.socketStatus((event, status) => {
+  socketConnected = status.connected;
+
+  if (!status.connected && !status.connecting) {
+    console.log('Socket disconnected');
+    if (isSearching) {
+      updateStatusMessage('Lost connection to search server. Attempting to reconnect...');
+    }
+  } else if (status.connecting) {
+    updateStatusMessage('Connecting to search server...');
+  }
+});
+
+// Handle search status updates
+window.electronAPI.searchStatus((event, status) => {
+  if (status === 'searching') {
+    setSearchingState(true);
+  } else if (status === 'error') {
+    setSearchingState(false);
+    updateStatusMessage('Error performing search. Please try again.');
+  }
 });
 
 // Clear the search
@@ -231,6 +277,12 @@ clearSearchBtn.addEventListener('click', (e) => {
   resultsList.innerHTML = '';
   initialMessage.style.display = 'block';
   noResults.style.display = 'none';
+
+  // Cancel ongoing search if any
+  if (isSearching) {
+    window.electronAPI.cancelSearch();
+    setSearchingState(false);
+  }
 });
 
 // Handle Escape key to close window
@@ -278,6 +330,7 @@ function displayResults(results) {
 
   if (!results || results.length === 0) {
     noResults.style.display = 'block';
+    noResults.textContent = 'Nessun risultato trovato';
     return;
   }
 
