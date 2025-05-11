@@ -25,7 +25,7 @@ const extensionIcons = {
   'docx': '📝',
   'xls': '📊',
   'xlsx': '📊',
-  'jpg': '🖼️',
+  'pptx': '🖼️',
   'jpeg': '🖼️',
   'png': '🖼️',
   'gif': '🖼️',
@@ -179,7 +179,9 @@ function executeSearch(query) {
     }
 
     // Send the query to the backend
+
     window.electronAPI.executeSearch(query);
+    updateStatusMessage('query sent...');
   }
 }
 
@@ -245,7 +247,6 @@ window.electronAPI.searchResults((event, results) => {
 // Handle socket status updates
 window.electronAPI.socketStatus((event, status) => {
   socketConnected = status.connected;
-
   if (!status.connected && !status.connecting) {
     console.log('Socket disconnected');
     if (isSearching) {
