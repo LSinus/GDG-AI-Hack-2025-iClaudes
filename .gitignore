@@ -1,1 +1,6 @@
 backend/env
+.idea
+backend/__pycache__
+backend/.idea
+backend/.venv
+frontend/spotlight-app/node_modules
