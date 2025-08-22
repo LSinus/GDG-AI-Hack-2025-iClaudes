@@ -105,8 +105,8 @@ Relevant File Results
 ## Team
 Created by iClaudes team:
 - [Leonardo Sinibaldi](https://github.com/LSinus) 
-- [Simone Ranfoni](https://github.com/saevuss) 
-- [Savo](https://github.com/gansimo) 
+- [Simone Ranfoni](https://github.com/gansimo) 
+- [Giorgia Savo](https://github.com/saevuss) 
 - [Marzia Favitta](https://github.com/marziafavitta)
 
 Developed for GDG AI Hackathon - HCI Track
